@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pl">
+
 <head>
   <meta charset="UTF-8" />
   <title>Fraudstarmusic.pl</title>
@@ -10,8 +11,13 @@
   <meta name="twitter:image" content="https://i1.sndcdn.com/avatars-ly6jbStEnZFx2mDu-W4chsQ-t200x200.jpg?v=1">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <!-- CSS WYCIĘTY DO OSOBNEGO PLIKU -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
   <div class="app">
     <!-- SIDEBAR -->
@@ -104,14 +110,8 @@
 
           <!-- SOUNDCLOUD WIDGET — MUSI ISTNIEĆ -->
           <div id="scWidgetWrapper" style="width:100%; max-width:600px; margin:25px 0;">
-            <iframe
-              id="scWidget"
-              width="100%"
-              height="300"
-              scrolling="no"
-              frameborder="no"
-              allow="autoplay"
-              src="https://w.soundcloud.com/player/?url=&color=%23ff6f3c&auto_play=false&show_teaser=false&visual=true">
+            <iframe id="scWidget" width="100%" height="300" scrolling="no" frameborder="no" allow="autoplay"
+              src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/uzzis-142743846/sets/taka-taktyczna-cn&color=%23ff6f3c&auto_play=false&show_teaser=false&visual=true">
             </iframe>
           </div>
 
@@ -121,7 +121,7 @@
 
           <!-- przycisk do dodania nowej playlisty (SoundCloud / linki) -->
           <button id="addPlaylistBtn" class="playlist-add-btn">
-              Zmień aktualną playlistę
+            Zmień aktualną playlistę
           </button>
         </section>
       </div>
@@ -139,9 +139,15 @@
 
       <div class="player-center">
         <div class="player-controls">
-          <button class="player-btn" id="prevBtn" title="Poprzedni utwór">⏮</button>
-          <button class="player-btn main" id="playToggle" title="Odtwarzaj / pauza">▶</button>
-          <button class="player-btn" id="nextBtn" title="Następny utwór">⏭</button>
+          <button class="player-btn" id="prevBtn" title="Poprzedni utwór">
+            <i class="fa-solid fa-backward-step"></i>
+          </button>
+          <button class="player-btn main" id="playToggle" title="Odtwarzaj / pauza">
+            <i class="fa-solid fa-play"></i>
+          </button>
+          <button class="player-btn" id="nextBtn" title="Następny utwór">
+            <i class="fa-solid fa-forward-step"></i>
+          </button>
         </div>
         <div class="player-timeline">
           <span id="timeCurrent">0:00</span>
@@ -153,8 +159,12 @@
       </div>
 
       <div class="player-right">
-        <span id="shuffleToggle" class="player-toggle" title="Tryb losowy">🔀</span>
-        <span id="loopToggle" class="player-toggle" title="Powtarzanie">🔁</span>
+        <button id="shuffleToggle" class="player-toggle-btn" title="Tryb losowy">
+          <i class="fa-solid fa-shuffle"></i>
+        </button>
+        <button id="loopToggle" class="player-toggle-btn" title="Powtarzanie">
+          <i class="fa-solid fa-repeat"></i>
+        </button>
         <div class="volume-bar" title="Głośność">
           <div class="volume-bar-fill" id="volumeFill"></div>
         </div>
@@ -169,5 +179,5 @@
   <script src="https://w.soundcloud.com/player/api.js"></script>
   <script src="app.js"></script>
 </body>
-</html>
 
+</html>
