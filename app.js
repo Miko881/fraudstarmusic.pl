@@ -73,51 +73,51 @@ const demoTracks = [
 // =====================
 // DOM
 // =====================
-const trackGrid       = document.getElementById("trackGrid");
-const searchInput     = document.getElementById("searchInput");
-const chips           = document.querySelectorAll(".chip");
+const trackGrid = document.getElementById("trackGrid");
+const searchInput = document.getElementById("searchInput");
+const chips = document.querySelectorAll(".chip");
 
-const audio           = document.getElementById("audioPlayer");
-const timeCurrent     = document.getElementById("timeCurrent");
-const timeTotal       = document.getElementById("timeTotal");
-const progressBar     = document.querySelector(".player-progress");
-const progressFill    = document.getElementById("progressFill");
+const audio = document.getElementById("audioPlayer");
+const timeCurrent = document.getElementById("timeCurrent");
+const timeTotal = document.getElementById("timeTotal");
+const progressBar = document.querySelector(".player-progress");
+const progressFill = document.getElementById("progressFill");
 
-const playerTitle     = document.getElementById("playerTitle");
-const playerArtist    = document.getElementById("playerArtist");
-const playerThumb     = document.getElementById("playerThumb");
+const playerTitle = document.getElementById("playerTitle");
+const playerArtist = document.getElementById("playerArtist");
+const playerThumb = document.getElementById("playerThumb");
 
-const playToggle      = document.getElementById("playToggle");
-const prevBtn         = document.getElementById("prevBtn");
-const nextBtn         = document.getElementById("nextBtn");
+const playToggle = document.getElementById("playToggle");
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
 
-const shuffleToggle   = document.getElementById("shuffleToggle");
-const loopToggle      = document.getElementById("loopToggle");
-const volumeBar       = document.querySelector(".volume-bar");
-const volumeFill      = document.getElementById("volumeFill");
+const shuffleToggle = document.getElementById("shuffleToggle");
+const loopToggle = document.getElementById("loopToggle");
+const volumeBar = document.querySelector(".volume-bar");
+const volumeFill = document.getElementById("volumeFill");
 
 // SoundCloud
-const scFrame         = document.getElementById("scWidget");
-const changeScBtn     = document.getElementById("addPlaylistBtn");
+const scFrame = document.getElementById("scWidget");
+const changeScBtn = document.getElementById("addPlaylistBtn");
 
 // =====================
 // STAN
 // =====================
-let currentFilter   = "all";
-let currentSearch   = "";
-let currentTrack    = null;
-let isPlaying       = false;
-let isShuffle       = false;
+let currentFilter = "all";
+let currentSearch = "";
+let currentTrack = null;
+let isPlaying = false;
+let isShuffle = false;
 
 // 'local' | 'sc'
-let playbackMode    = "local";
+let playbackMode = "local";
 
 // lista aktywna (dla NEXT / PREV) – domyślnie demoTracks
 let activeTrackList = demoTracks;
 
 // SoundCloud widget
-let scWidget        = null;
-let scDuration      = 0; // sekundy
+let scWidget = null;
+let scDuration = 0; // sekundy
 
 // domyślna playlista SC
 const DEFAULT_SC_URL = "https://soundcloud.com/uzzis-142743846/sets/taka-taktyczna-cn";
@@ -137,12 +137,36 @@ function formatTime(seconds) {
 }
 
 function updatePlayButton() {
-  playToggle.textContent = isPlaying ? "⏸" : "▶";
+  // Update main player button
+  playToggle.innerHTML = isPlaying
+    ? '<i class="fa-solid fa-pause"></i>'
+    : '<i class="fa-solid fa-play"></i>';
+
+  updateTrackCardIcons();
+}
+
+function updateTrackCardIcons() {
+  const allCards = document.querySelectorAll(".track-card");
+  allCards.forEach(card => {
+    const playBtn = card.querySelector(".track-play");
+    const id = parseInt(card.dataset.trackId);
+
+    // Reset icon
+    playBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+
+    // If this is the current track
+    if (currentTrack && currentTrack.id === id) {
+      // If playing -> show pause
+      if (isPlaying) {
+        playBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+      }
+    }
+  });
 }
 
 function updateTimeUI(current, duration) {
   timeCurrent.textContent = formatTime(current);
-  timeTotal.textContent   = formatTime(duration);
+  timeTotal.textContent = formatTime(duration);
 
   if (duration > 0) {
     const percent = (current / duration) * 100;
@@ -170,7 +194,7 @@ function renderTracks() {
     return matchesFilter && matchesSearch;
   });
 
-  filtered.forEach((track) => {
+  filtered.forEach((track, index) => {
     const card = document.createElement("article");
     card.className = "track-card";
     card.dataset.trackId = track.id;
@@ -178,7 +202,7 @@ function renderTracks() {
     card.innerHTML = `
       <div class="track-thumb" style="${track.cover ? `background-image:url('${track.cover}')` : ""}">
         <div class="track-badge">${track.badge || "UTWÓR"}</div>
-        <div class="track-play">▶</div>
+        <div class="track-play"><i class="fa-solid fa-play"></i></div>
       </div>
       <div class="track-meta">
         <div class="track-title" title="${track.title}">${track.title}</div>
@@ -190,7 +214,31 @@ function renderTracks() {
       </div>
     `;
 
+    // Stagger animation: każdy kolejny element opóźniony o 50ms
+    card.style.animationDelay = `${index * 0.05}s`;
+
     card.addEventListener("click", () => {
+      // Logic: if clicking the SAME track that is currently playing -> Toggle Pause
+      if (currentTrack && currentTrack.id === track.id) {
+        if (isPlaying) {
+          // Pause
+          if (playbackMode === 'sc' && scWidget) {
+            scWidget.pause();
+          } else {
+            audio.pause();
+          }
+        } else {
+          // Play
+          if (playbackMode === 'sc' && scWidget) {
+            scWidget.play();
+          } else {
+            audio.play().catch(console.error);
+          }
+        }
+        return;
+      }
+
+      // If clicking a NEW track
       // przełącz się na LOCAL i zatrzymaj SC
       playbackMode = "local";
       if (scWidget) scWidget.pause();
@@ -201,6 +249,9 @@ function renderTracks() {
 
     trackGrid.appendChild(card);
   });
+
+  // Update icons immediately after render (in case one is playing)
+  updateTrackCardIcons();
 }
 
 // =====================
