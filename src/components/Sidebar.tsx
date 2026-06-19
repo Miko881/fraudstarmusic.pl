@@ -180,7 +180,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, onOpenPlaylist
           className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white text-xs font-semibold py-2.5 rounded-xl bg-white/[0.02] hover:bg-white/5 transition-colors border border-white/5 cursor-pointer"
         >
           <Globe size={14} className="text-omnicord-neon" />
-          <span className="uppercase">{language === 'pl' ? 'English' : 'Polski'}</span>
+          <span className="uppercase">{language === 'pl' ? 'Polski' : 'English'}</span>
         </button>
 
         {/* Settings button */}
