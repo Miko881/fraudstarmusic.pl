@@ -1,197 +1,264 @@
 import type { Track } from '../types';
 
-// Multiple Invidious instances — open-source YouTube frontend with proper CORS headers
-// Unlike Piped, Invidious is specifically designed to allow cross-origin requests
+// ─────────────────────────────────────────────────────────────────────────────
+// YouTube API / Invidious API / iTunes Search API Service
+// ─────────────────────────────────────────────────────────────────────────────
+
+// List of public Invidious instances to try (active, CORS-friendly)
 const INVIDIOUS_INSTANCES = [
-  'https://iv.ggtyler.dev',
-  'https://invidious.nerdvpn.de',
-  'https://invidious.lunar.icu',
-  'https://inv.nadeko.net',
-  'https://invidious.privacydev.net',
+  'https://yt.chocolatemoo53.com',
+  'https://invidious.projectsegfau.lt',
+  'https://invidious.privacydev.net'
 ];
 
-// Simple request queue to avoid rate limiting from concurrent calls
-let activeRequests = 0;
-const MAX_CONCURRENT = 2;
-const pendingQueue: Array<() => void> = [];
-
-function throttledFetch(): Promise<void> {
-  return new Promise(resolve => {
-    if (activeRequests < MAX_CONCURRENT) {
-      activeRequests++;
-      resolve();
-    } else {
-      pendingQueue.push(() => {
-        activeRequests++;
-        resolve();
-      });
-    }
-  });
-}
-
-function releaseFetch() {
-  activeRequests--;
-  if (pendingQueue.length > 0) {
-    const next = pendingQueue.shift();
-    if (next) next();
-  }
-}
-
 /**
- * Fetch from Invidious API with automatic instance failover
+ * Retrieves the YouTube Data API Key from config in localStorage or Vite env
  */
-async function invidiousFetch(path: string): Promise<any> {
-  await throttledFetch();
+function getApiKey(): string | null {
   try {
-    let lastError: any = new Error('All Invidious instances failed');
-    for (const base of INVIDIOUS_INSTANCES) {
-      try {
-        const res = await fetch(`${base}${path}`);
-        if (res.ok) {
-          const json = await res.json();
-          return json;
-        }
-      } catch (e) {
-        lastError = e;
+    const saved = localStorage.getItem('omni_config');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.youtubeApiKey) {
+        return parsed.youtubeApiKey.trim();
       }
     }
-    throw lastError;
-  } finally {
-    releaseFetch();
+  } catch (e) {
+    console.error('Error reading YouTube API key from localStorage:', e);
   }
+  return (import.meta.env.VITE_YOUTUBE_API_KEY as string) || null;
 }
 
 /**
- * Map an Invidious video item to our Track type
+ * Searches YouTube using YouTube Data API v3
  */
-function invidiousVideoToTrack(item: any): Track | null {
-  const videoId = item.videoId;
-  if (!videoId || !item.title) return null;
-
-  // Best available thumbnail
-  const thumbnails: any[] = item.videoThumbnails || [];
-  const thumb = thumbnails.find((t: any) => t.quality === 'medium') ||
-                thumbnails.find((t: any) => t.quality === 'high') ||
-                thumbnails[0];
-  const cover = thumb?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-
-  return {
-    id: `yt-${videoId}`,
-    title: item.title,
-    artist: item.author || 'YouTube',
-    cover,
-    duration: item.lengthSeconds || 210,
-    source: 'youtube' as const,
-    videoId,
-  };
+async function searchWithYouTubeAPI(query: string, apiKey: string): Promise<Track[]> {
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=10&key=${apiKey}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(`YouTube API Error: ${res.status} - ${errorData?.error?.message || 'Unknown error'}`);
+  }
+  
+  const data = await res.json();
+  if (!data.items || !Array.isArray(data.items)) return [];
+  
+  return data.items
+    .filter((item: any) => item.id && item.id.videoId)
+    .map((item: any) => {
+      const snippets = item.snippet || {};
+      const thumbnails = snippets.thumbnails || {};
+      const cover = thumbnails.high?.url || thumbnails.medium?.url || thumbnails.default?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
+      
+      return {
+        id: item.id.videoId,
+        title: snippets.title || 'Nieznany tytuł',
+        artist: snippets.channelTitle || 'Nieznany wykonawca',
+        cover,
+        duration: 240, // default placeholder, API doesn't return duration in search
+        source: 'youtube' as const,
+        videoId: item.id.videoId,
+        tag: 'YouTube',
+      };
+    });
 }
 
 /**
- * Search YouTube via Invidious API (proper CORS, no proxy needed)
+ * Searches YouTube using public Invidious instances (CORS fallback)
  */
 async function searchWithInvidious(query: string): Promise<Track[]> {
+  let lastError = null;
+  
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 4000);
+      const res = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(timer);
+      
+      if (!res.ok) continue;
+      
+      const data = await res.json();
+      if (!Array.isArray(data)) continue;
+      
+      return data
+        .filter((item: any) => item.videoId)
+        .map((item: any) => {
+          const cover = item.videoThumbnails?.find((t: any) => t.quality === 'medium' || t.quality === 'high')?.url 
+            || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
+            
+          return {
+            id: item.videoId,
+            title: item.title || 'Nieznany tytuł',
+            artist: item.author || 'Nieznany wykonawca',
+            cover,
+            duration: item.lengthSeconds || 240,
+            source: 'youtube' as const,
+            videoId: item.videoId,
+            tag: 'YouTube',
+          };
+        });
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`Invidious instance failed: ${instance} - ${err.message}`);
+    }
+  }
+  
+  throw lastError || new Error('All Invidious instances failed');
+}
+
+/**
+ * Searches iTunes Search API as metadata fallback (CORS-friendly, no keys)
+ */
+async function searchWithiTunes(query: string): Promise<Track[]> {
+  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=15&explicit=yes`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`iTunes API Error: ${res.status}`);
+  
+  const data = await res.json();
+  if (!data.results || !Array.isArray(data.results)) return [];
+  
+  return data.results
+    .filter((item: any) => item.trackName && item.artistName)
+    .map((item: any) => {
+      const cover = item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '400x400bb') : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
+      const searchQuery = `${item.artistName} ${item.trackName}`;
+      
+      return {
+        // Use a unique query placeholder ID so Player/OmniProvider knows to resolve it
+        id: `itunes-${item.trackId || Math.random()}`,
+        title: item.trackName,
+        artist: item.artistName,
+        cover,
+        duration: Math.floor((item.trackTimeMillis || 240000) / 1000),
+        source: 'youtube' as const,
+        videoId: `itq-${searchQuery.toLowerCase().replace(/[^a-z0-9]/g, '-')}`, // marker
+        tag: item.primaryGenreName || 'Music',
+      };
+    });
+}
+
+/**
+ * Main Search Entrance. Tries YouTube API -> Invidious Fallback -> iTunes Fallback.
+ */
+export async function searchYouTube(query: string): Promise<Track[]> {
+  if (!query || query.trim().length === 0) return [];
+  
+  const apiKey = getApiKey();
+  
+  if (apiKey) {
+    try {
+      console.log('Searching via YouTube Data API...');
+      return await searchWithYouTubeAPI(query, apiKey);
+    } catch (err) {
+      console.warn('YouTube API search failed, falling back to Invidious...', err);
+    }
+  }
+  
   try {
-    const data = await invidiousFetch(
-      `/api/v1/search?q=${encodeURIComponent(query)}&type=video&sort_by=relevance`
-    );
-    if (!Array.isArray(data)) return getMockSearchResults(query);
-
-    const tracks: Track[] = data
-      .filter((item: any) => item.type === 'video' && item.videoId)
-      .map(invidiousVideoToTrack)
-      .filter(Boolean) as Track[];
-
-    if (tracks.length === 0) return getMockSearchResults(query);
-    return tracks.slice(0, 10);
-  } catch (error) {
-    console.error('Invidious search failed:', error);
+    console.log('Searching via Invidious instances...');
+    return await searchWithInvidious(query);
+  } catch (err) {
+    console.warn('Invidious search failed, falling back to iTunes API...', err);
+  }
+  
+  try {
+    console.log('Searching via iTunes Search API (requires runtime resolution)...');
+    return await searchWithiTunes(query);
+  } catch (err) {
+    console.error('All search APIs failed:', err);
     return getMockSearchResults(query);
   }
 }
 
-/**
- * Returns mock/static results if all APIs fail
- */
 function getMockSearchResults(query: string): Track[] {
-  const normalized = query.toLowerCase();
-  const allMocks: Track[] = [
+  const q = query.toLowerCase();
+  const mocks: Track[] = [
     {
-      id: 'yt-JfJY6Y11SgQ',
-      title: 'Omnicord Wave - Synthwave Lofi Beats',
-      artist: 'Omnicord Records',
-      cover: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60',
-      duration: 180,
+      id: 'dQw4w9WgXcQ',
+      title: 'Never Gonna Give You Up',
+      artist: 'Rick Astley',
+      cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80',
+      duration: 212,
       source: 'youtube',
-      videoId: 'JfJY6Y11SgQ',
-      plays: '1.2M',
-      tag: 'Trending'
-    },
-    {
-      id: 'yt-5qap5aO4i9A',
-      title: 'Lofi Hip Hop Radio - Beats to Study/Relax to',
-      artist: 'ChilledCow',
-      cover: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&auto=format&fit=crop&q=60',
-      duration: 300,
-      source: 'youtube',
-      videoId: '5qap5aO4i9A',
-      plays: '45.1M',
-      tag: 'Discovery'
-    },
-    {
-      id: 'yt-tntOCGkgt98',
-      title: 'Deep Focus Ambient Music for Coding',
-      artist: 'Ambient Waves',
-      cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=60',
-      duration: 240,
-      source: 'youtube',
-      videoId: 'tntOCGkgt98',
-      plays: '3.4M',
-      tag: 'Mix'
+      videoId: 'dQw4w9WgXcQ',
+      tag: 'Pop',
     }
   ];
-
-  return allMocks.filter(
-    t => t.title.toLowerCase().includes(normalized) || t.artist.toLowerCase().includes(normalized)
+  return mocks.filter(m =>
+    m.title.toLowerCase().includes(q) || m.artist.toLowerCase().includes(q)
   );
-}
-
-export async function searchYouTube(query: string): Promise<Track[]> {
-  if (!query || query.trim().length === 0) return [];
-  return searchWithInvidious(query);
 }
 
 export function extractPlaylistId(input: string): string | null {
   const trimmed = input.trim();
-
-  // Try matching list= URL parameter
   const match = trimmed.match(/[&?]list=([^&]+)/);
-  if (match && match[1]) {
-    return match[1];
-  }
-
-  // Match standard ID format (18 to 34 chars)
-  if (/^[a-zA-Z0-9_-]{18,34}$/.test(trimmed)) {
-    return trimmed;
-  }
-
+  if (match?.[1]) return match[1];
+  if (/^[a-zA-Z0-9_-]{18,34}$/.test(trimmed)) return trimmed;
   return null;
 }
 
-export async function scrapeYouTubePlaylist(playlistId: string): Promise<{ name: string; description: string; tracks: Track[] }> {
+/**
+ * Scrapes/Fetches YouTube Playlist items. Requires YouTube API Key.
+ */
+export async function scrapeYouTubePlaylist(playlistId: string): Promise<{
+  name: string;
+  description: string;
+  tracks: Track[];
+}> {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error('Importowanie playlist YouTube wymaga skonfigurowania klucza API w Ustawieniach.');
+  }
+  
   try {
-    const data = await invidiousFetch(`/api/v1/playlists/${playlistId}`);
-
-    const tracks: Track[] = (data.videos || [])
-      .map(invidiousVideoToTrack)
-      .filter(Boolean) as Track[];
-
-    return {
-      name: data.title || 'Zaimportowana Playlista',
-      description: data.description || 'Import z YouTube',
-      tracks: tracks.map(t => ({ ...t, source: 'youtube' as const }))
-    };
-  } catch (error) {
-    console.error('Invidious playlist fetch failed:', error);
-    throw error;
+    // 1. Fetch Playlist Info
+    const infoUrl = `https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${playlistId}&key=${apiKey}`;
+    const infoRes = await fetch(infoUrl);
+    if (!infoRes.ok) throw new Error(`Status ${infoRes.status} fetching playlist metadata`);
+    const infoData = await infoRes.json();
+    
+    if (!infoData.items || infoData.items.length === 0) {
+      throw new Error('Playlista nie została znaleziona lub jest prywatna.');
+    }
+    
+    const playlistSnippet = infoData.items[0].snippet;
+    const name = playlistSnippet.title || 'Zaimportowana playlista';
+    const description = playlistSnippet.description || 'Zaimportowano z YouTube';
+    
+    // 2. Fetch Playlist Items
+    const itemsUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${playlistId}&maxResults=50&key=${apiKey}`;
+    const itemsRes = await fetch(itemsUrl);
+    if (!itemsRes.ok) throw new Error(`Status ${itemsRes.status} fetching playlist items`);
+    const itemsData = await itemsRes.json();
+    
+    if (!itemsData.items || !Array.isArray(itemsData.items)) {
+      return { name, description, tracks: [] };
+    }
+    
+    const tracks: Track[] = itemsData.items
+      .filter((item: any) => item.contentDetails && item.contentDetails.videoId)
+      .map((item: any) => {
+        const snippet = item.snippet || {};
+        const thumbnails = snippet.thumbnails || {};
+        const cover = thumbnails.high?.url || thumbnails.medium?.url || thumbnails.default?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
+        
+        return {
+          id: item.contentDetails.videoId,
+          title: snippet.title || 'Nieznany tytuł',
+          artist: snippet.videoOwnerChannelTitle || snippet.channelTitle || 'Nieznany wykonawca',
+          cover,
+          duration: 240, // placeholder
+          source: 'youtube' as const,
+          videoId: item.contentDetails.videoId,
+          tag: 'YouTube Playlist'
+        };
+      });
+      
+    return { name, description, tracks };
+  } catch (err: any) {
+    console.error('Playlist import failed:', err);
+    throw new Error(`Błąd importu playlisty: ${err.message}`);
   }
 }

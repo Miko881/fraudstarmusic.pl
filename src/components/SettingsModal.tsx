@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useOmni } from '../context/OmniProvider';
-import { X, Sliders, Music, Check } from 'lucide-react';
+import { X, Sliders, Music, Check, Key } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   
   const [crossfadeDuration, setCrossfadeDuration] = useState(config.crossfadeDuration ?? 2);
   const [audioQuality, setAudioQuality] = useState(config.audioQuality ?? 'high');
+  const [youtubeApiKey, setYoutubeApiKey] = useState(config.youtubeApiKey ?? '');
   const [isSaved, setIsSaved] = useState(false);
 
   if (!isOpen) return null;
@@ -20,7 +21,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     e.preventDefault();
     updateConfig({
       crossfadeDuration: Number(crossfadeDuration),
-      audioQuality
+      audioQuality,
+      youtubeApiKey: youtubeApiKey.trim()
     });
     setIsSaved(true);
     setTimeout(() => {
@@ -86,6 +88,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 <option value="medium">Średnia (Standard)</option>
                 <option value="low">Niska (Oszczędzanie danych)</option>
               </select>
+            </div>
+          </div>
+
+          {/* Section: YouTube API */}
+          <div className="space-y-4 border-t border-white/5 pt-6">
+            <div className="flex items-center gap-2 text-sm font-semibold text-gray-300 uppercase tracking-wider">
+              <Key size={16} className="text-omnicord-cyan" />
+              <span>YouTube API</span>
+            </div>
+            
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              Wklej swój klucz YouTube Data API v3, aby odblokować błyskawiczne wyszukiwanie i importowanie publicznych playlist. Bez klucza aplikacja korzysta z publicznych serwerów fallback.
+            </p>
+
+            <div className="space-y-2">
+              <label className="block text-xs text-gray-400">Klucz API YouTube (opcjonalny)</label>
+              <input
+                type="password"
+                value={youtubeApiKey}
+                onChange={(e) => setYoutubeApiKey(e.target.value)}
+                placeholder="AIzaSy..."
+                className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-2.5 text-white outline-none focus:border-omnicord-cyan/50 text-sm font-mono tracking-wider"
+              />
             </div>
           </div>
 

@@ -55,7 +55,8 @@ const OmniContext = createContext<OmniContextType | undefined>(undefined);
 
 const DEFAULT_CONFIG: OmniConfig = {
   crossfadeDuration: 2,
-  audioQuality: 'high'
+  audioQuality: 'high',
+  youtubeApiKey: ''
 };
 
 export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -176,17 +177,20 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  // Resolve Spotify Track to YouTube Video ID
+  // Resolve Spotify/iTunes Track to YouTube Video ID
   const resolveTrack = async (track: Track): Promise<Track> => {
-    if (track.videoId) return track;
+    if (track.videoId && !track.videoId.startsWith('itq-')) return track;
 
     setIsResolving(true);
     try {
       const searchQuery = `${track.artist} - ${track.title}`.substring(0, 100);
       const searchResults = await searchYouTube(searchQuery);
       
-      if (searchResults.length > 0) {
-        const matched = searchResults[0];
+      // Filter out any results that are also iTunes queries to prevent infinite loop
+      const validResults = searchResults.filter(t => t.videoId && !t.videoId.startsWith('itq-'));
+      
+      if (validResults.length > 0) {
+        const matched = validResults[0];
         const updatedTrack = {
           ...track,
           videoId: matched.videoId,
@@ -201,7 +205,7 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error("No matching video found on YouTube Music.");
       }
     } catch (e) {
-      console.error("Error resolving Spotify track to YouTube Music:", e);
+      console.error("Error resolving track to YouTube Music:", e);
       throw e;
     } finally {
       setIsResolving(false);
@@ -212,7 +216,7 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const playTrack = async (track: Track, newQueue?: Track[]) => {
     try {
       let resolved = track;
-      if (track.source === 'spotify' && !track.videoId) {
+      if (!track.videoId || track.videoId.startsWith('itq-') || (track.source === 'spotify' && !track.videoId)) {
         resolved = await resolveTrack(track);
       }
 

@@ -25,4 +25,5 @@ export interface Playlist {
 export interface OmniConfig {
   crossfadeDuration: number; // in seconds, e.g. 2 for 2-second transition
   audioQuality: 'high' | 'medium' | 'low';
+  youtubeApiKey?: string;
 }
