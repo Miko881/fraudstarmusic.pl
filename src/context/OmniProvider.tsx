@@ -253,7 +253,8 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setIsResolving(true);
     try {
-      const searchQuery = `${track.artist} - ${track.title}`.substring(0, 100);
+      // Append "Official Audio" or "Topic" to prioritize official studio tracks over music videos/covers
+      const searchQuery = `${track.artist} - ${track.title} official audio`.substring(0, 100);
       const searchResults = await searchYouTube(searchQuery);
       
       // Filter out any results that are also iTunes queries to prevent infinite loop
@@ -272,6 +273,21 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         return updatedTrack;
       } else {
+        // Fallback search without "official audio" if no results found
+        const fallbackQuery = `${track.artist} - ${track.title}`.substring(0, 100);
+        const fallbackResults = await searchYouTube(fallbackQuery);
+        const validFallback = fallbackResults.filter(t => t.videoId && !t.videoId.startsWith('itq-'));
+        
+        if (validFallback.length > 0) {
+          const matched = validFallback[0];
+          const updatedTrack = {
+            ...track,
+            videoId: matched.videoId,
+            id: track.id
+          };
+          setQueue(prev => prev.map(t => t.id === track.id ? { ...t, videoId: matched.videoId } : t));
+          return updatedTrack;
+        }
         throw new Error("No matching video found on YouTube Music.");
       }
     } catch (e) {
