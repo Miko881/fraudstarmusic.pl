@@ -49,6 +49,10 @@ interface OmniContextType {
   importYouTubePlaylist: (playlistId: string) => Promise<void>;
   history: Track[];
   addToHistory: (track: Track) => void;
+
+  // Localization
+  language: 'pl' | 'en';
+  setLanguage: (lang: 'pl' | 'en') => void;
 }
 
 const OmniContext = createContext<OmniContextType | undefined>(undefined);
@@ -70,6 +74,18 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activeView, setActiveView] = useState<'start' | 'discovery' | 'trending' | 'mix' | 'playlist' | 'search'>('start');
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Language State
+  const [language, setLanguageState] = useState<'pl' | 'en'>(() => {
+    const saved = localStorage.getItem('omni_language');
+    if (saved === 'pl' || saved === 'en') return saved;
+    return navigator.language.startsWith('pl') ? 'pl' : 'en';
+  });
+
+  const setLanguage = (lang: 'pl' | 'en') => {
+    setLanguageState(lang);
+    localStorage.setItem('omni_language', lang);
+  };
 
   // Playback State
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
@@ -448,6 +464,8 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
       importYouTubePlaylist={importYouTubePlaylist}
       history={history}
       addToHistory={addToHistory}
+      language={language}
+      setLanguage={setLanguage}
     >
       {children}
     </OmniProviderValueHelper>

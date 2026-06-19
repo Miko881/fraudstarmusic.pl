@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useOmni } from '../context/OmniProvider';
 import { X, Sliders, Music, Check, Key } from 'lucide-react';
+import { translations } from '../utils/translations';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -8,12 +9,14 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { config, updateConfig } = useOmni();
+  const { config, updateConfig, language } = useOmni();
   
   const [crossfadeDuration, setCrossfadeDuration] = useState(config.crossfadeDuration ?? 2);
   const [audioQuality, setAudioQuality] = useState(config.audioQuality ?? 'high');
   const [youtubeApiKey, setYoutubeApiKey] = useState(config.youtubeApiKey ?? '');
   const [isSaved, setIsSaved] = useState(false);
+
+  const t = translations[language];
 
   if (!isOpen) return null;
 
@@ -41,7 +44,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
             <Sliders className="text-omnicord-cyan w-6 h-6 animate-pulse" />
-            <h2 className="text-2xl font-bold text-white tracking-wide">Ustawienia Omnicord</h2>
+            <h2 className="text-2xl font-bold text-white tracking-wide">
+              {language === 'pl' ? 'Ustawienia Omnicord' : 'Omnicord Settings'}
+            </h2>
           </div>
           <button 
             onClick={onClose} 
@@ -56,13 +61,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-300 uppercase tracking-wider">
               <Music size={16} className="text-omnicord-neon" />
-              <span>Dźwięk i Mikser</span>
+              <span>{language === 'pl' ? 'Dźwięk i Mikser' : 'Sound & Mixer'}</span>
             </div>
 
             {/* Crossfade Slider */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-gray-400">Płynne przejście (Crossfade)</span>
+                <span className="text-gray-400">{t.crossfadeLabel}</span>
                 <span className="text-omnicord-neon font-semibold">{crossfadeDuration}s</span>
               </div>
               <input 
@@ -78,15 +83,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
             {/* Audio Quality */}
             <div className="space-y-2">
-              <label className="block text-xs text-gray-400">Jakość Dźwięku (Streaming)</label>
+              <label className="block text-xs text-gray-400">{t.audioQualityLabel}</label>
               <select
                 value={audioQuality}
                 onChange={(e: any) => setAudioQuality(e.target.value)}
                 className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-2 text-white outline-none focus:border-omnicord-cyan/50 text-sm"
               >
-                <option value="high">Wysoka (Premium Audio)</option>
-                <option value="medium">Średnia (Standard)</option>
-                <option value="low">Niska (Oszczędzanie danych)</option>
+                <option value="high">{language === 'pl' ? 'Wysoka (Premium Audio)' : 'High (Premium Audio)'}</option>
+                <option value="medium">{language === 'pl' ? 'Średnia (Standard)' : 'Medium (Standard)'}</option>
+                <option value="low">{language === 'pl' ? 'Niska (Oszczędzanie danych)' : 'Low (Data saver)'}</option>
               </select>
             </div>
           </div>
@@ -99,11 +104,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             </div>
             
             <p className="text-[11px] text-gray-400 leading-relaxed">
-              Wklej swój klucz YouTube Data API v3, aby odblokować błyskawiczne wyszukiwanie i importowanie publicznych playlist. Bez klucza aplikacja korzysta z publicznych serwerów fallback.
+              {language === 'pl' 
+                ? 'Wklej swój klucz YouTube Data API v3, aby odblokować błyskawiczne wyszukiwanie i importowanie playlist. Bez klucza aplikacja korzysta z serwerów publicznych.'
+                : 'Paste your YouTube Data API v3 key to unlock instant searches and playlist imports. Without it, the app falls back to public servers.'}
             </p>
 
             <div className="space-y-2">
-              <label className="block text-xs text-gray-400">Klucz API YouTube (opcjonalny)</label>
+              <label className="block text-xs text-gray-400">{t.youtubeApiKeyLabel}</label>
               <input
                 type="password"
                 value={youtubeApiKey}
@@ -127,10 +134,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             {isSaved ? (
               <>
                 <Check size={18} />
-                <span>Zapisano zmiany!</span>
+                <span>{language === 'pl' ? 'Zapisano zmiany!' : 'Settings saved!'}</span>
               </>
             ) : (
-              <span>Zapisz Ustawienia</span>
+              <span>{t.saveSettings}</span>
             )}
           </button>
         </form>

@@ -6,12 +6,13 @@ import {
 } from 'lucide-react';
 import { musicEngine } from '../../services/MusicEngine';
 import { TrackCover } from '../TrackCover';
+import { translations } from '../../utils/translations';
 
 export const Player: React.FC = () => {
   const {
     currentTrack, isPlaying, volume, setVolume,
     togglePlay, nextTrack, prevTrack, shuffle, setShuffle, repeatMode, setRepeatMode,
-    isResolving, isLiked, toggleLikeTrack
+    isResolving, isLiked, toggleLikeTrack, language
   } = useOmni();
 
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -21,35 +22,23 @@ export const Player: React.FC = () => {
   const [prevVolume, setPrevVolume] = useState(volume);
   const [isHoveredVolume, setIsHoveredVolume] = useState(false);
 
+  const t = translations[language];
+
   // Sync video visibility to MusicEngine on mount or state change
   useEffect(() => {
     musicEngine.toggleVideoVisibility(isVideoVisible);
   }, [isVideoVisible]);
 
-  // Subscribe to playback updates locally for currentTime and duration
+  // Handle local playback events from MusicEngine
   useEffect(() => {
     const unsubscribe = musicEngine.subscribe((engineState) => {
       setCurrentTime(engineState.currentTime);
       setDuration(engineState.duration);
     });
+
     return () => unsubscribe();
   }, []);
 
-  // Format seconds to MM:SS
-  const formatTime = (secs: number) => {
-    if (isNaN(secs)) return '0:00';
-    const mins = Math.floor(secs / 60);
-    const remaining = Math.floor(secs % 60);
-    return `${mins}:${remaining.toString().padStart(2, '0')}`;
-  };
-
-  // Seek handler
-  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = Number(e.target.value);
-    musicEngine.seek(val);
-  };
-
-  // Mute toggle
   const handleMuteToggle = () => {
     if (isMuted) {
       setVolume(prevVolume);
@@ -61,18 +50,30 @@ export const Player: React.FC = () => {
     }
   };
 
-  // Repeat toggle cycle: none -> all -> one -> none
+  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = parseFloat(e.target.value);
+    musicEngine.seek(time);
+    setCurrentTime(time);
+  };
+
   const handleRepeatToggle = () => {
     if (repeatMode === 'none') setRepeatMode('all');
     else if (repeatMode === 'all') setRepeatMode('one');
     else setRepeatMode('none');
   };
 
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds) || seconds === null) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const currentPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <footer className="h-24 glass-panel border-t border-white/5 px-8 flex items-center justify-between relative z-20 bg-[#050505]/80 backdrop-blur-3xl">
-      {/* Top mini progress bar for mobile */}
+    <footer className="h-20 bg-black/60 border-t border-white/5 px-4 md:px-8 flex items-center justify-between backdrop-blur-xl relative z-20 shrink-0">
+      {/* Mobile Top timeline scrubber */}
       <div className="absolute top-0 left-0 w-full h-[2px] bg-white/5 md:hidden">
         <div 
           className="h-full bg-omnicord-cyan transition-all duration-300"
@@ -126,11 +127,11 @@ export const Player: React.FC = () => {
               {isResolving ? (
                 <div className="flex items-center gap-1.5 text-xs text-omnicord-cyan font-bold animate-pulse">
                   <Loader2 size={10} className="animate-spin" />
-                  <span>Strumieniowanie z YouTube...</span>
+                  <span>{t.resolvingTrack}</span>
                 </div>
               ) : (
                 <div className="text-xs text-gray-400 truncate font-semibold">
-                  {currentTrack.artist}
+                  {currentTrack.artist || t.unknownArtist}
                 </div>
               )}
             </div>
@@ -143,7 +144,7 @@ export const Player: React.FC = () => {
                   ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]'
                   : 'text-gray-500 hover:text-gray-300'
               }`}
-              title={isLiked(currentTrack.id) ? "Usuń z polubionych" : "Polub utwór"}
+              title={isLiked(currentTrack.id) ? t.unlikeText : t.likeText}
             >
               <ThumbsUp size={16} fill={isLiked(currentTrack.id) ? 'currentColor' : 'none'} />
             </button>
@@ -151,7 +152,7 @@ export const Player: React.FC = () => {
         ) : (
           <div className="flex items-center gap-3 text-gray-500 text-sm font-semibold">
             <Music size={18} />
-            <span>Wybierz utwór do odtworzenia</span>
+            <span>{language === 'pl' ? 'Wybierz utwór do odtworzenia' : 'Select a track to play'}</span>
           </div>
         )}
       </div>
@@ -166,7 +167,7 @@ export const Player: React.FC = () => {
             className={`transition-colors p-1 rounded-lg ${
               shuffle ? 'text-omnicord-neon hover:text-omnicord-neon/80' : 'text-gray-500 hover:text-gray-300'
             }`}
-            title="Tryb losowy"
+            title={t.shuffleText}
           >
             <Shuffle size={15} className={shuffle ? "drop-shadow-[0_0_5px_#deff9a]" : ""} />
           </button>
@@ -176,7 +177,7 @@ export const Player: React.FC = () => {
             onClick={prevTrack}
             disabled={!currentTrack}
             className="text-gray-400 hover:text-white disabled:opacity-30 active:scale-90 transition-all p-1"
-            title="Poprzedni utwór"
+            title={language === 'pl' ? 'Poprzedni utwór' : 'Previous track'}
           >
             <SkipBack size={18} fill="currentColor" />
           </button>
@@ -186,7 +187,7 @@ export const Player: React.FC = () => {
             onClick={togglePlay}
             disabled={!currentTrack || isResolving}
             className="w-12 h-12 rounded-full bg-white text-black hover:bg-omnicord-neon hover:shadow-[0_0_15px_rgba(222,255,154,0.4)] flex items-center justify-center disabled:opacity-40 disabled:hover:bg-white active:scale-95 transition-all relative"
-            title={isPlaying ? "Pauza" : "Odtwarzaj"}
+            title={isPlaying ? (language === 'pl' ? 'Pauza' : 'Pause') : (language === 'pl' ? 'Odtwarzaj' : 'Play')}
           >
             {isResolving ? (
               <Loader2 size={20} className="text-black animate-spin" />
@@ -202,7 +203,7 @@ export const Player: React.FC = () => {
             onClick={nextTrack}
             disabled={!currentTrack}
             className="text-gray-400 hover:text-white disabled:opacity-30 active:scale-90 transition-all p-1"
-            title="Następny utwór"
+            title={language === 'pl' ? 'Następny utwór' : 'Next track'}
           >
             <SkipForward size={18} fill="currentColor" />
           </button>
@@ -213,7 +214,9 @@ export const Player: React.FC = () => {
             className={`transition-colors p-1 rounded-lg ${
               repeatMode !== 'none' ? 'text-omnicord-cyan hover:text-omnicord-cyan/80' : 'text-gray-500 hover:text-gray-300'
             }`}
-            title={`Powtarzanie: ${repeatMode === 'none' ? 'brak' : repeatMode === 'one' ? 'utwór' : 'kolejka'}`}
+            title={`${language === 'pl' ? 'Powtarzanie' : 'Repeat'}: ${
+              repeatMode === 'none' ? t.repeatNone : repeatMode === 'one' ? t.repeatOne : t.repeatAll
+            }`}
           >
             {repeatMode === 'one' ? (
               <Repeat1 size={15} className="drop-shadow-[0_0_5px_#06b6d4]" />
@@ -278,10 +281,10 @@ export const Player: React.FC = () => {
               ? 'bg-omnicord-cyan/10 border-omnicord-cyan/30 text-omnicord-cyan hover:bg-omnicord-cyan/20' 
               : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-white/20'
           }`}
-          title="Przełącz podgląd wideo YouTube"
+          title={t.videoPanelText}
         >
           <Tv size={13} />
-          <span>Wideo</span>
+          <span>{language === 'pl' ? 'Wideo' : 'Video'}</span>
         </button>
 
         {/* Volume controls */}
@@ -293,6 +296,7 @@ export const Player: React.FC = () => {
           <button 
             onClick={handleMuteToggle}
             className="text-gray-400 hover:text-white p-1 rounded hover:bg-white/5 transition-colors"
+            title={isMuted ? t.unmuteText : t.muteText}
           >
             {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </button>

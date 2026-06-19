@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOmni } from '../context/OmniProvider';
 import type { Track } from '../types';
 import { searchYouTube } from '../utils/youtube';
+import { translations } from '../utils/translations';
 import { 
   Search, Play, Clock, Trash2, 
   Sparkles, Flame, Compass, Disc, Library, RefreshCw, Music,
@@ -14,7 +15,7 @@ export const MainContent: React.FC = () => {
   const { 
     activeView, setActiveView, selectedPlaylistId, playlists, removeTrackFromPlaylist,
     searchQuery, setSearchQuery, playTrack, currentTrack, isPlaying,
-    history
+    history, language
   } = useOmni();
 
   // Local state for categories / custom mixes
@@ -30,6 +31,8 @@ export const MainContent: React.FC = () => {
   // Recommendation state
   const [recTracks, setRecTracks] = useState<Track[]>([]);
   const [recLoading, setRecLoading] = useState(false);
+
+  const t = translations[language];
 
   const lastPlayedArtist = history && history.length > 0 ? history[0].artist : null;
 
@@ -49,10 +52,39 @@ export const MainContent: React.FC = () => {
     }
   }, [lastPlayedArtist]);
 
+  const getMoodSearchTerm = (mood: string) => {
+    const terms: Record<string, { pl: string, en: string }> = {
+      'Zastrzyk energii': { pl: 'Zastrzyk energii muzyka', en: 'energy boost music' },
+      'Relaks': { pl: 'muzyka relaksacyjna', en: 'chill relaxation music' },
+      'Trening': { pl: 'muzyka do treningu', en: 'workout music' },
+      'Koncentracja': { pl: 'muzyka do nauki koncentracji', en: 'focus study music' },
+      'Impreza': { pl: 'muzyka na impreze dance party', en: 'dance party music hits' },
+      'Romans': { pl: 'muzyka romantyczna love', en: 'romantic love songs' },
+      'Smutna': { pl: 'smutna muzyka', en: 'sad music' },
+      'Sen': { pl: 'muzyka do snu lofi sleep', en: 'deep sleep music lofi' },
+    };
+    return terms[mood]?.[language] || `${mood} music`;
+  };
+
+  const getMoodLabel = (mood: string) => {
+    const labels: Record<string, string> = {
+      'Zastrzyk energii': t.energy,
+      'Relaks': t.relaxation,
+      'Trening': t.workout,
+      'Koncentracja': t.concentration,
+      'Impreza': t.party,
+      'Romans': t.romance,
+      'Smutna': t.sad,
+      'Sen': t.sleep
+    };
+    return labels[mood] || mood;
+  };
+
   const loadMoodTracks = async (mood: string) => {
     setMoodLoading(true);
     try {
-      const tracks = await searchYouTube(`${mood} muzyka`);
+      const searchTerm = getMoodSearchTerm(mood);
+      const tracks = await searchYouTube(searchTerm);
       setMoodTracks(tracks);
     } catch (e) {
       console.error(e);
@@ -72,6 +104,7 @@ export const MainContent: React.FC = () => {
       setRecLoading(false);
     }
   };
+
   const formatDuration = (secs: number) => {
     const mins = Math.floor(secs / 60);
     const remaining = secs % 60;
@@ -97,11 +130,11 @@ export const MainContent: React.FC = () => {
     try {
       let query = 'music';
       if (cat === 'Trending') {
-        query = 'muzyka hity pl';
+        query = language === 'pl' ? 'muzyka hity pl' : 'trending music hits';
       } else if (cat === 'Discovery') {
-        query = 'nowe wydania muzyczne';
+        query = language === 'pl' ? 'nowe wydania muzyczne' : 'new music releases';
       } else if (cat === 'Mix') {
-        query = 'składanka muzyczna mix';
+        query = language === 'pl' ? 'składanka muzyczna mix' : 'lofi chill music mix';
       }
       const tracks = await searchYouTube(query);
       setCategoryTracks(tracks);
@@ -115,12 +148,24 @@ export const MainContent: React.FC = () => {
   // Get current active playlist details
   const activePlaylist = playlists.find(p => p.id === selectedPlaylistId);
 
+  const getPlaylistName = (pl: typeof playlists[number]) => {
+    if (pl.id === 'pl-liked') return t.likedSongsPlaylist;
+    if (pl.id === 'pl-favorites') return t.defaultPlaylistName;
+    return pl.name;
+  };
+
+  const getPlaylistDesc = (pl: typeof playlists[number]) => {
+    if (pl.id === 'pl-liked') return t.likedSongsDescription;
+    if (pl.id === 'pl-favorites') return t.defaultPlaylistDescription;
+    return pl.description || t.noDescription;
+  };
+
   // Time-based greetings
   const getGreeting = () => {
     const hrs = new Date().getHours();
-    if (hrs < 12) return 'Dzień dobry, słuchaczu';
-    if (hrs < 18) return 'Miłego popołudnia';
-    return 'Dobry wieczór';
+    if (hrs < 12) return t.morningGreeting;
+    if (hrs < 18) return t.afternoonGreeting;
+    return t.eveningGreeting;
   };
 
   // Render standard search top bar
@@ -140,7 +185,7 @@ export const MainContent: React.FC = () => {
               setActiveView('start');
             }
           }}
-          placeholder="Szukaj utworów, artystów, playlist..."
+          placeholder={t.searchPlaceholder}
           className="w-full glass-input !pl-11 bg-white/[0.02]"
         />
       </div>
@@ -149,7 +194,7 @@ export const MainContent: React.FC = () => {
       <div className="hidden sm:flex items-center gap-4 text-xs font-semibold text-gray-400 shrink-0">
         <span className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-4 py-2">
           <span className="w-1.5 h-1.5 rounded-full bg-omnicord-neon animate-pulse"></span>
-          <span>Silnik: YouTube IFrame</span>
+          <span>{t.engineStats}</span>
         </span>
       </div>
     </div>
@@ -169,7 +214,7 @@ export const MainContent: React.FC = () => {
               onClick={() => setActiveMood(null)}
               className="text-xs font-semibold px-4 py-2 rounded-full border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-all cursor-pointer shrink-0"
             >
-              Wyczyść filtr (×)
+              {t.clearFilter}
             </button>
           )}
           {['Zastrzyk energii', 'Relaks', 'Trening', 'Koncentracja', 'Impreza', 'Romans', 'Smutna', 'Sen'].map((mood) => {
@@ -184,7 +229,7 @@ export const MainContent: React.FC = () => {
                     : 'border-white/5 bg-white/5 text-gray-400 hover:text-white hover:border-white/10'
                 }`}
               >
-                {mood}
+                {getMoodLabel(mood)}
               </button>
             );
           })}
@@ -196,9 +241,9 @@ export const MainContent: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-6 rounded-full bg-omnicord-cyan"></span>
-                <h2 className="text-xl font-extrabold text-white tracking-wide">Odkryj: {activeMood}</h2>
+                <h2 className="text-xl font-extrabold text-white tracking-wide">{t.discoverMood}: {getMoodLabel(activeMood)}</h2>
               </div>
-              <p className="text-xs text-gray-500 mt-1 font-medium">Miks muzyczny przygotowany dla nastroju "{activeMood}"</p>
+              <p className="text-xs text-gray-500 mt-1 font-medium">{t.moodMixFor} "{getMoodLabel(activeMood)}"</p>
             </div>
 
             {moodLoading ? (
@@ -245,11 +290,11 @@ export const MainContent: React.FC = () => {
           <div className="space-y-2 relative z-10">
             <div className="flex items-center gap-2 text-omnicord-neon text-xs font-bold uppercase tracking-widest">
               <Sparkles size={14} />
-              <span>Twoja hybryda muzyczna</span>
+              <span>{t.welcomeSubtitle}</span>
             </div>
             <h1 className="text-4xl font-extrabold text-white leading-none tracking-tight">{getGreeting()}</h1>
             <p className="text-sm text-gray-400 max-w-md font-medium leading-relaxed">
-              Odkryj płynne połączenie luksusowej biblioteki Spotify oraz nieograniczonego streamingu wideo z YouTube.
+              {t.welcomeDesc}
             </p>
           </div>
           <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-omnicord-cyan/20 to-transparent pointer-events-none blur-3xl rounded-full"></div>
@@ -259,8 +304,8 @@ export const MainContent: React.FC = () => {
         {history && history.length > 0 && (
           <section className="space-y-4">
             <div>
-              <span className="text-[10px] font-bold text-omnicord-cyan uppercase tracking-widest block mb-0.5">Twoja historia</span>
-              <h2 className="text-xl font-extrabold text-white tracking-wide">Posłuchaj jeszcze raz</h2>
+              <span className="text-[10px] font-bold text-omnicord-cyan uppercase tracking-widest block mb-0.5">{t.yourHistory}</span>
+              <h2 className="text-xl font-extrabold text-white tracking-wide">{t.listenAgain}</h2>
             </div>
 
             <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-white/5 scrollbar-track-transparent">
@@ -294,8 +339,8 @@ export const MainContent: React.FC = () => {
         {history && history.length > 0 && recTracks.length > 0 && (
           <section className="space-y-4">
             <div>
-              <span className="text-[10px] font-bold text-omnicord-neon uppercase tracking-widest block mb-0.5">Polecane dla Ciebie</span>
-              <h2 className="text-xl font-extrabold text-white tracking-wide">Na podstawie: {history[0].artist}</h2>
+              <span className="text-[10px] font-bold text-omnicord-neon uppercase tracking-widest block mb-0.5">{t.recommendedForYou}</span>
+              <h2 className="text-xl font-extrabold text-white tracking-wide">{t.basedOn}: {history[0].artist}</h2>
             </div>
 
             {recLoading ? (
@@ -340,8 +385,8 @@ export const MainContent: React.FC = () => {
         {/* Quick Play Grid */}
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-bold text-white tracking-wide">Szybki Start</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Twoje najczęstsze wybory muzyczne</p>
+            <h2 className="text-lg font-bold text-white tracking-wide">{t.quickStart}</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{t.quickStartSub}</p>
           </div>
 
           {categoryLoading ? (
@@ -396,24 +441,24 @@ export const MainContent: React.FC = () => {
             className="glass-card hover:shadow-[0_10px_20px_rgba(222,255,154,0.04)] cursor-pointer group"
           >
             <Compass className="text-omnicord-neon w-8 h-8 mb-4 group-hover:scale-110 transition-transform duration-300" />
-            <h3 className="text-white font-bold text-base mb-1">Kategoria Discovery</h3>
-            <p className="text-xs text-gray-400 font-medium">Inteligentnie polecane utwory na bazie Twojej historii oraz trendów.</p>
+            <h3 className="text-white font-bold text-base mb-1">{t.discoveryCardTitle}</h3>
+            <p className="text-xs text-gray-400 font-medium">{t.discoveryCardDesc}</p>
           </div>
           <div 
             onClick={() => setActiveView('trending')}
             className="glass-card hover:shadow-[0_10px_20px_rgba(6,182,212,0.04)] cursor-pointer group"
           >
             <Flame className="text-omnicord-cyan w-8 h-8 mb-4 group-hover:scale-110 transition-transform duration-300" />
-            <h3 className="text-white font-bold text-base mb-1">Kategoria Trending</h3>
-            <p className="text-xs text-gray-400 font-medium">Aktualne top hity i najchętniej grane utwory w Twoim regionie.</p>
+            <h3 className="text-white font-bold text-base mb-1">{t.trendingCardTitle}</h3>
+            <p className="text-xs text-gray-400 font-medium">{t.trendingCardDesc}</p>
           </div>
           <div 
             onClick={() => setActiveView('mix')}
             className="glass-card hover:shadow-[0_10px_20px_rgba(255,255,255,0.04)] cursor-pointer group"
           >
             <Disc className="text-white w-8 h-8 mb-4 group-hover:scale-110 transition-transform duration-300" />
-            <h3 className="text-white font-bold text-base mb-1">Kategoria Mix</h3>
-            <p className="text-xs text-gray-400 font-medium">Stworzone dla Ciebie miksy gatunkowe, nastrojowe i lo-fi loopy.</p>
+            <h3 className="text-white font-bold text-base mb-1">{t.mixCardTitle}</h3>
+            <p className="text-xs text-gray-400 font-medium">{t.mixCardDesc}</p>
           </div>
         </section>
       </div>
@@ -449,12 +494,12 @@ export const MainContent: React.FC = () => {
                 ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
                 : 'text-omnicord-neon bg-omnicord-neon/10 border-omnicord-neon/20'
             }`}>
-              {activePlaylist.id === 'pl-liked' ? '📌 Auto-playlista' : 'Hybrydowa Playlista'}
+              {activePlaylist.id === 'pl-liked' ? t.likedSongsLabel : t.hybridPlaylistLabel}
             </span>
-            <h1 className="text-4xl font-extrabold text-white tracking-tight">{activePlaylist.name}</h1>
-            <p className="text-sm text-gray-400 font-medium">{activePlaylist.description || 'Brak opisu playlisty.'}</p>
+            <h1 className="text-4xl font-extrabold text-white tracking-tight">{getPlaylistName(activePlaylist)}</h1>
+            <p className="text-sm text-gray-400 font-medium">{getPlaylistDesc(activePlaylist)}</p>
             <div className="text-xs text-gray-500 font-semibold pt-1">
-              Liczba utworów: {tracks.length} • Hybrydowe źródła
+              {t.playlistTracksCount}: {tracks.length} • {t.playlistHybridSources}
             </div>
           </div>
         </div>
@@ -463,9 +508,11 @@ export const MainContent: React.FC = () => {
         {tracks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Music className="w-12 h-12 text-gray-600 mb-3" />
-            <p className="text-gray-400 font-bold">Ta playlista jest pusta</p>
+            <p className="text-gray-400 font-bold">{language === 'pl' ? 'Ta playlista jest pusta' : 'This playlist is empty'}</p>
             <p className="text-xs text-gray-600 mt-1 max-w-xs leading-relaxed">
-              Skorzystaj z paska wyszukiwania na górze, aby znaleźć utwory, a następnie kliknij ikonę plusa, aby dodać je do tej playlisty.
+              {language === 'pl' 
+                ? 'Skorzystaj z paska wyszukiwania na górze, aby znaleźć utwory, a następnie kliknij ikonę plusa, aby dodać je do tej playlisty.' 
+                : 'Use the search bar at the top to find tracks, then click the plus icon to add them to this playlist.'}
             </p>
           </div>
         ) : (
@@ -473,9 +520,9 @@ export const MainContent: React.FC = () => {
             {/* Table Header */}
             <div className="grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 sm:px-6 py-3 border-b border-white/5 text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-white/[0.01]">
               <div className="w-8 text-center">#</div>
-              <div>Tytuł</div>
-              <div className="hidden sm:block">Wykonawca</div>
-              <div className="w-16 text-center text-xs shrink-0">Źródło</div>
+              <div>{t.tracklistHeaderTitle}</div>
+              <div className="hidden sm:block">{t.tracklistHeaderArtist}</div>
+              <div className="w-16 text-center text-xs shrink-0">{t.tracklistHeaderSource}</div>
               <div className="w-20 sm:w-24 text-right pr-2 sm:pr-6 shrink-0"><Clock size={12} className="inline" /></div>
             </div>
 
@@ -550,7 +597,7 @@ export const MainContent: React.FC = () => {
                       <button 
                         onClick={() => removeTrackFromPlaylist(activePlaylist.id, track.id)}
                         className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 p-1 rounded-lg hover:bg-red-500/10 transition-all duration-150"
-                        title="Usuń z playlisty"
+                        title={language === 'pl' ? 'Usuń z playlisty' : 'Remove from playlist'}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -567,20 +614,26 @@ export const MainContent: React.FC = () => {
 
   // RENDER: Category View (Discovery / Trending / Mix)
   const renderCategoryView = () => {
+    const categoryLabel = activeCategory === 'Discovery' ? t.discovery : (activeCategory === 'Trending' ? t.trending : t.mix);
+
     return (
       <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6">
         {/* Category Header */}
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
           <div>
-            <h2 className="text-2xl font-bold text-white tracking-wide capitalize">{activeCategory}</h2>
-            <p className="text-xs text-gray-500 mt-1">Szybkie, gotowe i automatycznie wyszukiwane listy odtwarzania</p>
+            <h2 className="text-2xl font-bold text-white tracking-wide capitalize">{categoryLabel}</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              {language === 'pl' 
+                ? 'Szybkie, gotowe i automatycznie wyszukiwane listy odtwarzania' 
+                : 'Quick, pre-defined and dynamically searched playlists'}
+            </p>
           </div>
           <button 
             onClick={() => loadCategoryTracks(activeCategory)}
             className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white bg-white/5 border border-white/10 hover:border-white/20 px-3 py-2 rounded-xl transition-all duration-200 font-semibold"
           >
             <RefreshCw size={12} className={categoryLoading ? "animate-spin" : ""} />
-            <span>Odśwież</span>
+            <span>{language === 'pl' ? 'Odśwież' : 'Refresh'}</span>
           </button>
         </div>
 
@@ -594,9 +647,9 @@ export const MainContent: React.FC = () => {
             {/* Table Header */}
             <div className="grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 sm:px-6 py-3 border-b border-white/5 text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-white/[0.01]">
               <div className="w-8 text-center">#</div>
-              <div>Tytuł</div>
-              <div className="hidden sm:block">Wykonawca</div>
-              <div className="w-16 text-center text-xs shrink-0">Źródło</div>
+              <div>{t.tracklistHeaderTitle}</div>
+              <div className="hidden sm:block">{t.tracklistHeaderArtist}</div>
+              <div className="w-16 text-center text-xs shrink-0">{t.tracklistHeaderSource}</div>
               <div className="w-20 sm:w-24 text-right pr-2 sm:pr-6 shrink-0"><Clock size={12} className="inline" /></div>
             </div>
 
@@ -696,8 +749,6 @@ export const MainContent: React.FC = () => {
 
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-[#050505] overflow-hidden relative">
-
-
       {renderTopBar()}
 
       {/* Main View Router */}

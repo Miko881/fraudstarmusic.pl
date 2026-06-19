@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useOmni } from '../context/OmniProvider';
 import { X, PlusCircle, Check, Loader2 } from 'lucide-react';
 import { extractPlaylistId } from '../utils/youtube';
+import { translations } from '../utils/translations';
 
 const YoutubeIcon: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ size = 24, className, ...props }) => (
   <svg 
@@ -21,7 +22,7 @@ interface PlaylistModalProps {
 }
 
 export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose }) => {
-  const { createPlaylist, importYouTubePlaylist } = useOmni();
+  const { createPlaylist, importYouTubePlaylist, language } = useOmni();
   
   const [activeTab, setActiveTab] = useState<'create' | 'import'>('create');
   
@@ -35,6 +36,8 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose })
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
+
+  const t = translations[language];
 
   if (!isOpen) return null;
 
@@ -69,7 +72,11 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose })
 
     const playlistId = extractPlaylistId(ytUrlOrId);
     if (!playlistId) {
-      setImportError("Niepoprawny format URL lub ID playlisty. Wprowadź pełny adres URL lub ID (np. PL...)");
+      setImportError(
+        language === 'pl'
+          ? "Niepoprawny format URL lub ID playlisty. Wprowadź pełny adres URL lub ID (np. PL...)"
+          : "Invalid URL or Playlist ID format. Please input full URL or ID (e.g. PL...)"
+      );
       return;
     }
 
@@ -81,7 +88,12 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose })
         handleClose();
       }, 1500);
     } catch (err: any) {
-      setImportError(err.message || "Wystąpił błąd podczas importowania. Upewnij się, że playlista jest publiczna i spróbuj ponownie.");
+      setImportError(
+        err.message || 
+        (language === 'pl'
+          ? "Wystąpił błąd podczas importowania. Upewnij się, że playlista jest publiczna i spróbuj ponownie."
+          : "An error occurred during import. Ensure the playlist is public and try again.")
+      );
     } finally {
       setIsImporting(false);
     }
@@ -102,7 +114,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose })
               <YoutubeIcon className="text-red-500" size={24} />
             )}
             <h2 className="text-2xl font-bold text-white tracking-wide">
-              {activeTab === 'create' ? 'Nowa Playlista' : 'Importuj z YouTube'}
+              {activeTab === 'create' ? t.createPlaylistTitle : t.importYoutubeLabel}
             </h2>
           </div>
           <button 
@@ -123,7 +135,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose })
                 : 'text-gray-500 hover:text-gray-300 font-medium'
             }`}
           >
-            Stwórz własną
+            {language === 'pl' ? 'Stwórz własną' : 'Create own'}
           </button>
           <button
             onClick={() => { setActiveTab('import'); setImportError(null); }}
@@ -133,7 +145,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose })
                 : 'text-gray-500 hover:text-gray-300 font-medium'
             }`}
           >
-            Import z YouTube
+            {language === 'pl' ? 'Import z YouTube' : 'Import from YouTube'}
           </button>
         </div>
 
@@ -142,24 +154,24 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose })
           <form onSubmit={handleCreateSubmit} className="space-y-6">
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="block text-xs text-gray-400 font-semibold uppercase tracking-wider">Nazwa playlisty *</label>
+                <label className="block text-xs text-gray-400 font-semibold uppercase tracking-wider">{t.playlistNameLabel} *</label>
                 <input 
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Np. Nocne Kodowanie"
+                  placeholder={t.playlistNamePlaceholder}
                   className="w-full glass-input text-white"
                   maxLength={40}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs text-gray-400 font-semibold uppercase tracking-wider">Opis (Opcjonalnie)</label>
+                <label className="block text-xs text-gray-400 font-semibold uppercase tracking-wider">{t.playlistDescLabel}</label>
                 <textarea 
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Dodaj krótki opis playlisty..."
+                  placeholder={t.playlistDescPlaceholder}
                   className="w-full glass-input h-24 resize-none py-3 text-white"
                   maxLength={120}
                 />
@@ -179,10 +191,10 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose })
               {isCreated ? (
                 <>
                   <Check size={18} />
-                  <span>Utworzono playlistę!</span>
+                  <span>{language === 'pl' ? 'Utworzono playlistę!' : 'Playlist created!'}</span>
                 </>
               ) : (
-                <span>Utwórz Playlistę</span>
+                <span>{language === 'pl' ? 'Utwórz Playlistę' : 'Create Playlist'}</span>
               )}
             </button>
           </form>
@@ -191,7 +203,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose })
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="block text-xs text-gray-400 font-semibold uppercase tracking-wider">
-                  Link lub ID Playlisty YouTube Music *
+                  {language === 'pl' ? 'Link lub ID Playlisty YouTube Music *' : 'YouTube Music Playlist Link or ID *'}
                 </label>
                 <input 
                   type="text"
@@ -199,11 +211,13 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose })
                   disabled={isImporting || importSuccess}
                   value={ytUrlOrId}
                   onChange={(e) => setYtUrlOrId(e.target.value)}
-                  placeholder="ID (PL...) lub link do playlisty"
+                  placeholder={t.importYoutubePlaceholder}
                   className="w-full glass-input pl-4 text-white"
                 />
                 <span className="block text-[10px] text-gray-500 leading-normal mt-1.5 font-medium">
-                  Wspiera linki z YouTube Music i standardowego YouTube. Playlista musi być publiczna lub niepubliczna (dostępna przez link), aby nasz serwer mógł ją odczytać.
+                  {language === 'pl' 
+                    ? 'Wspiera linki z YouTube Music i standardowego YouTube. Playlista musi być publiczna lub niepubliczna (dostępna przez link), aby nasz serwer mógł ją odczytać.'
+                    : 'Supports YouTube Music and standard YouTube links. Playlist must be public or unlisted for our server to read it.'}
                 </span>
               </div>
 
@@ -227,15 +241,15 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({ isOpen, onClose })
               {isImporting ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  <span>Importowanie utwór po utworze...</span>
+                  <span>{t.importing}</span>
                 </>
               ) : importSuccess ? (
                 <>
                   <Check size={18} />
-                  <span>Zaimportowano playlistę!</span>
+                  <span>{language === 'pl' ? 'Zaimportowano playlistę!' : 'Playlist imported!'}</span>
                 </>
               ) : (
-                <span>Rozpocznij Import</span>
+                <span>{language === 'pl' ? 'Rozpocznij Import' : 'Start Import'}</span>
               )}
             </button>
           </form>

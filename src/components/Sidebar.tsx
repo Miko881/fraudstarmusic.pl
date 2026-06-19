@@ -1,8 +1,9 @@
 import React from 'react';
 import { useOmni } from '../context/OmniProvider';
+import { translations } from '../utils/translations';
 import { 
   Home, Compass, TrendingUp, Radio, Plus, Settings, 
-  Music, Trash2, ThumbsUp
+  Music, Trash2, ThumbsUp, Globe
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -13,14 +14,16 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, onOpenPlaylistModal }) => {
   const { 
     activeView, setActiveView, playlists, selectedPlaylistId, 
-    setSelectedPlaylistId, deletePlaylist
+    setSelectedPlaylistId, deletePlaylist, language, setLanguage
   } = useOmni();
 
+  const t = translations[language];
+
   const navItems = [
-    { id: 'start', label: 'Start', icon: Home, color: 'text-omnicord-cyan' },
-    { id: 'discovery', label: 'Discovery', icon: Compass, color: 'text-omnicord-neon' },
-    { id: 'trending', label: 'Trending', icon: TrendingUp, color: 'text-omnicord-cyan' },
-    { id: 'mix', label: 'Mix', icon: Radio, color: 'text-omnicord-neon' },
+    { id: 'start', labelKey: 'start', icon: Home, color: 'text-omnicord-cyan' },
+    { id: 'discovery', labelKey: 'discovery', icon: Compass, color: 'text-omnicord-neon' },
+    { id: 'trending', labelKey: 'trending', icon: TrendingUp, color: 'text-omnicord-cyan' },
+    { id: 'mix', labelKey: 'mix', icon: Radio, color: 'text-omnicord-neon' },
   ] as const;
 
   const handleNavClick = (viewId: typeof navItems[number]['id']) => {
@@ -35,9 +38,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, onOpenPlaylist
 
   const handleDeletePlaylist = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (confirm("Czy na pewno chcesz usunąć tę playlistę?")) {
+    if (confirm(t.confirmDeletePlaylist)) {
       deletePlaylist(id);
     }
+  };
+
+  const getPlaylistName = (pl: typeof playlists[number]) => {
+    if (pl.id === 'pl-liked') return t.likedSongsPlaylist;
+    if (pl.id === 'pl-favorites') return t.defaultPlaylistName;
+    return pl.name;
+  };
+
+  const toggleLanguage = () => {
+    setLanguage(language === 'pl' ? 'en' : 'pl');
   };
 
   return (
@@ -56,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, onOpenPlaylist
 
       {/* Main Navigation */}
       <div className="px-4 py-6 space-y-1">
-        <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">Przeglądaj</div>
+        <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">{t.browse}</div>
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeView === item.id && !selectedPlaylistId;
@@ -71,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, onOpenPlaylist
               }`}
             >
               <Icon className={`w-4 h-4 ${isActive ? 'text-omnicord-cyan' : 'text-gray-500'}`} />
-              <span>{item.label}</span>
+              <span>{t[item.labelKey]}</span>
             </button>
           );
         })}
@@ -82,11 +95,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, onOpenPlaylist
       {/* Playlists Section */}
       <div className="flex-1 px-4 py-6 overflow-y-auto flex flex-col min-h-0">
         <div className="flex items-center justify-between px-3 mb-3">
-          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Biblioteka</span>
+          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{t.library}</span>
           <button 
             onClick={onOpenPlaylistModal}
             className="text-gray-400 hover:text-omnicord-neon hover:bg-white/5 p-1 rounded-lg transition-all"
-            title="Utwórz nową playlistę"
+            title={t.createNewPlaylist}
           >
             <Plus size={16} />
           </button>
@@ -111,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, onOpenPlaylist
                   ) : (
                     <Music className={`w-4 h-4 shrink-0 ${isActive ? 'text-omnicord-neon' : 'text-gray-500'}`} />
                   )}
-                  <span className="truncate">{pl.name}</span>
+                  <span className="truncate">{getPlaylistName(pl)}</span>
                 </div>
                 {pl.id !== 'pl-favorites' && pl.id !== 'pl-liked' && (
                   <button 
@@ -128,14 +141,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, onOpenPlaylist
       </div>
 
       {/* Bottom Panel */}
-      <div className="p-4 border-t border-white/5 bg-black/20">
+      <div className="p-4 border-t border-white/5 bg-black/20 space-y-2">
+        {/* Language switch button */}
+        <button 
+          onClick={toggleLanguage}
+          className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white text-xs font-semibold py-2.5 rounded-xl bg-white/[0.02] hover:bg-white/5 transition-colors border border-white/5"
+        >
+          <Globe size={14} className="text-omnicord-neon" />
+          <span className="uppercase">{language === 'pl' ? 'English' : 'Polski'}</span>
+        </button>
+
         {/* Settings button */}
         <button 
           onClick={onOpenSettings}
           className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white text-xs font-semibold py-3.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5"
         >
           <Settings size={14} className="text-omnicord-cyan" />
-          <span>Ustawienia Odtwarzacza</span>
+          <span>{t.playerSettings}</span>
         </button>
       </div>
     </aside>

@@ -4,13 +4,16 @@ import type { Track } from '../types';
 import { useOmniSearch } from '../hooks/useOmniSearch';
 import { Play, Plus, Clock, PlusCircle, Check, Loader2, Music } from 'lucide-react';
 import { TrackCover } from './TrackCover';
+import { translations } from '../utils/translations';
 
 export const SearchResults: React.FC = () => {
-  const { searchQuery, playTrack, playlists, addTrackToPlaylist, currentTrack, isPlaying } = useOmni();
+  const { searchQuery, playTrack, playlists, addTrackToPlaylist, currentTrack, isPlaying, language } = useOmni();
   const { tracks, loading, error } = useOmniSearch(searchQuery);
   
   const [activeMenuTrackId, setActiveMenuTrackId] = useState<string | null>(null);
   const [addedMessage, setAddedMessage] = useState<{trackId: string, playlistName: string} | null>(null);
+
+  const t = translations[language];
 
   const formatDuration = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -27,17 +30,26 @@ export const SearchResults: React.FC = () => {
     addTrackToPlaylist(playlistId, track);
     const pl = playlists.find(p => p.id === playlistId);
     if (pl) {
-      setAddedMessage({ trackId: track.id, playlistName: pl.name });
+      const plName = pl.id === 'pl-liked' ? t.likedSongsPlaylist : (pl.id === 'pl-favorites' ? t.defaultPlaylistName : pl.name);
+      setAddedMessage({ trackId: track.id, playlistName: plName });
       setTimeout(() => setAddedMessage(null), 2000);
     }
     setActiveMenuTrackId(null);
+  };
+
+  const getPlaylistName = (pl: typeof playlists[number]) => {
+    if (pl.id === 'pl-liked') return t.likedSongsPlaylist;
+    if (pl.id === 'pl-favorites') return t.defaultPlaylistName;
+    return pl.name;
   };
 
   if (loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 text-omnicord-cyan animate-spin" />
-        <p className="text-sm text-gray-400 mt-3 font-medium">Przeszukiwanie Spotify i YouTube...</p>
+        <p className="text-sm text-gray-400 mt-3 font-medium">
+          {language === 'pl' ? 'Przeszukiwanie Spotify i YouTube...' : 'Searching Spotify and YouTube...'}
+        </p>
       </div>
     );
   }
@@ -45,7 +57,9 @@ export const SearchResults: React.FC = () => {
   if (error) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-6 min-h-[400px]">
-        <div className="text-red-400 text-lg font-bold mb-2">Błąd wyszukiwania</div>
+        <div className="text-red-400 text-lg font-bold mb-2">
+          {language === 'pl' ? 'Błąd wyszukiwania' : 'Search Error'}
+        </div>
         <p className="text-sm text-gray-500 max-w-sm">{error}</p>
       </div>
     );
@@ -54,8 +68,12 @@ export const SearchResults: React.FC = () => {
   if (tracks.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-6 min-h-[400px]">
-        <p className="text-gray-400 text-lg font-medium">Brak wyników</p>
-        <p className="text-sm text-gray-600 mt-1 max-w-xs">Wpisz inną frazę, np. nazwę ulubionego utworu lub artysty.</p>
+        <p className="text-gray-400 text-lg font-medium">{t.noResults}</p>
+        <p className="text-sm text-gray-600 mt-1 max-w-xs">
+          {language === 'pl' 
+            ? 'Wpisz inną frazę, np. nazwę ulubionego utworu lub artysty.' 
+            : 'Enter a different phrase, e.g. the name of your favorite track or artist.'}
+        </p>
       </div>
     );
   }
@@ -63,17 +81,23 @@ export const SearchResults: React.FC = () => {
   return (
     <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-white tracking-wide">Wyniki Wyszukiwania</h2>
-        <p className="text-xs text-gray-500 mt-1">Połączone wyniki z katalogu Spotify oraz wyszukiwarki YouTube</p>
+        <h2 className="text-2xl font-bold text-white tracking-wide">
+          {language === 'pl' ? 'Wyniki Wyszukiwania' : 'Search Results'}
+        </h2>
+        <p className="text-xs text-gray-500 mt-1">
+          {language === 'pl' 
+            ? 'Połączone wyniki z katalogu Spotify oraz wyszukiwarki YouTube' 
+            : 'Combined results from Spotify catalog and YouTube search'}
+        </p>
       </div>
 
       <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
         {/* Table Header */}
         <div className="grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 sm:px-6 py-3 border-b border-white/5 text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-white/[0.01]">
           <div className="w-8 text-center">#</div>
-          <div>Tytuł</div>
-          <div className="hidden sm:block">Wykonawca</div>
-          <div className="w-16 text-center text-xs shrink-0">Źródło</div>
+          <div>{t.tracklistHeaderTitle}</div>
+          <div className="hidden sm:block">{t.tracklistHeaderArtist}</div>
+          <div className="w-16 text-center text-xs shrink-0">{t.tracklistHeaderSource}</div>
           <div className="w-20 sm:w-24 text-right pr-2 sm:pr-6 shrink-0"><Clock size={12} className="inline" /></div>
         </div>
 
@@ -152,7 +176,7 @@ export const SearchResults: React.FC = () => {
                     <button 
                       onClick={() => setActiveMenuTrackId(menuOpen ? null : track.id)}
                       className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-all"
-                      title="Dodaj do playlisty"
+                      title={t.addTo}
                     >
                       <Plus size={14} />
                     </button>
@@ -162,7 +186,7 @@ export const SearchResults: React.FC = () => {
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setActiveMenuTrackId(null)} />
                         <div className="absolute right-0 bottom-full mb-1.5 w-48 glass-panel rounded-xl border border-white/10 p-1.5 shadow-xl z-50 animate-fade-in text-left">
-                          <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest px-2.5 py-1">Dodaj do:</div>
+                          <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest px-2.5 py-1">{t.addTo}:</div>
                           <div className="max-h-36 overflow-y-auto space-y-0.5">
                             {playlists.map((pl) => (
                               <button
@@ -170,7 +194,7 @@ export const SearchResults: React.FC = () => {
                                 onClick={() => handleAddToPlaylist(pl.id, track)}
                                 className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-colors truncate flex items-center justify-between"
                               >
-                                <span>{pl.name}</span>
+                                <span>{getPlaylistName(pl)}</span>
                                 <PlusCircle size={10} className="text-gray-500" />
                               </button>
                             ))}
@@ -179,20 +203,20 @@ export const SearchResults: React.FC = () => {
                       </>
                     )}
                   </div>
-
-                  {/* Inline Notification Toast */}
-                  {addedMessage && addedMessage.trackId === track.id && (
-                    <div className="absolute right-0 top-full mt-1.5 bg-emerald-500 text-black text-[10px] font-bold py-1 px-2.5 rounded-lg shadow-lg flex items-center gap-1 z-50 animate-bounce">
-                      <Check size={10} strokeWidth={3} />
-                      <span>Dodano do {addedMessage.playlistName}!</span>
-                    </div>
-                  )}
                 </div>
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* Floating Add Toast Notification */}
+      {addedMessage && (
+        <div className="fixed bottom-24 right-6 bg-[#0a0a0a]/90 backdrop-blur-md border border-omnicord-neon/30 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 z-50 animate-slide-up text-xs font-semibold">
+          <Check size={14} className="text-omnicord-neon" />
+          <span>{t.addedToPlaylist}: <strong className="text-omnicord-neon">{addedMessage.playlistName}</strong></span>
+        </div>
+      )}
     </div>
   );
 };
