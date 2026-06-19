@@ -118,6 +118,6 @@ export async function searchSpotify(query: string): Promise<Track[]> {
 }
 
 // Dummy category tracks for start page placeholders if not search
-export async function getSpotifyCategoryTracks(category: 'Discovery' | 'Trending' | 'Mix'): Promise<Track[]> {
+export async function getSpotifyCategoryTracks(_category: 'Discovery' | 'Trending' | 'Mix'): Promise<Track[]> {
   return [];
 }
