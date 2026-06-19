@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Omnicord</title>
 
-    <!-- OpenGraph / Discord embed — language-aware via ?lang=en -->
+    <!-- SEO & OpenGraph / Discord embed -->
     <meta name="description" content="Omnicord — Potęga hybrydy łącząca wyszukiwanie piosenek ze Spotify oraz YouTube Music w jednym odtwarzaczu." />
     <meta property="og:site_name" content="Omnicord" />
     <meta property="og:title" content="Omnicord" />
@@ -22,35 +22,13 @@
     <meta name="twitter:image" content="https://mikokohai.pl/og-image.png" />
     <meta name="theme-color" content="#050505" />
 
-    <!-- Dynamically update OG tags based on ?lang=en query param -->
-    <script>
-      (function() {
-        var params = new URLSearchParams(window.location.search);
-        var lang = params.get('lang');
-        if (lang === 'en') {
-          document.documentElement.setAttribute('lang', 'en');
-          document.title = 'Omnicord';
-          var metaDesc = document.querySelector('meta[name="description"]');
-          var ogDesc = document.querySelector('meta[property="og:description"]');
-          var ogTitle = document.querySelector('meta[property="og:title"]');
-          var twitterDesc = document.querySelector('meta[name="twitter:description"]');
-          var twitterTitle = document.querySelector('meta[name="twitter:title"]');
-          if (metaDesc) metaDesc.setAttribute('content', 'Omnicord — Hybrid power combining Spotify catalog search and YouTube Music in one seamless player with crossfade.');
-          if (ogDesc) ogDesc.setAttribute('content', 'Integrated hybrid search from Spotify and YouTube Music catalogs in one player with smooth crossfade.');
-          if (ogTitle) ogTitle.setAttribute('content', 'Omnicord');
-          if (twitterDesc) twitterDesc.setAttribute('content', 'Integrated hybrid search from Spotify and YouTube Music catalogs in one player with smooth crossfade.');
-          if (twitterTitle) twitterTitle.setAttribute('content', 'Omnicord');
-        }
-      })();
-    </script>
-
     <!-- Google Fonts (Outfit) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <script type="module" crossorigin src="./assets/index-DFqVg4Gb.js"></script>
+    <script type="module" crossorigin src="./assets/index--Rmzig1l.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-DBdcTh2k.css">
   </head>
   <body class="bg-[#050505] text-gray-300 font-outfit select-none overflow-hidden antialiased">
