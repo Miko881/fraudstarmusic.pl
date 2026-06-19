@@ -47,17 +47,17 @@ async function searchWithYouTubeAPI(query: string, apiKey: string): Promise<Trac
     .filter((item: any) => item.id && item.id.videoId)
     .map((item: any) => {
       const snippets = item.snippet || {};
-      const thumbnails = snippets.thumbnails || {};
-      const cover = thumbnails.high?.url || thumbnails.medium?.url || thumbnails.default?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
+      const videoId = item.id.videoId;
+      const cover = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
       
       return {
-        id: item.id.videoId,
+        id: videoId,
         title: snippets.title || 'Nieznany tytuł',
         artist: snippets.channelTitle || 'Nieznany wykonawca',
         cover,
         duration: 240, // default placeholder, API doesn't return duration in search
         source: 'youtube' as const,
-        videoId: item.id.videoId,
+        videoId,
         tag: 'YouTube',
       };
     });
@@ -85,17 +85,17 @@ async function searchWithInvidious(query: string): Promise<Track[]> {
       return data
         .filter((item: any) => item.videoId)
         .map((item: any) => {
-          const cover = item.videoThumbnails?.find((t: any) => t.quality === 'medium' || t.quality === 'high')?.url 
-            || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
+          const videoId = item.videoId;
+          const cover = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
             
           return {
-            id: item.videoId,
+            id: videoId,
             title: item.title || 'Nieznany tytuł',
             artist: item.author || 'Nieznany wykonawca',
             cover,
             duration: item.lengthSeconds || 240,
             source: 'youtube' as const,
-            videoId: item.videoId,
+            videoId,
             tag: 'YouTube',
           };
         });
@@ -241,17 +241,17 @@ export async function scrapeYouTubePlaylist(playlistId: string): Promise<{
       .filter((item: any) => item.contentDetails && item.contentDetails.videoId)
       .map((item: any) => {
         const snippet = item.snippet || {};
-        const thumbnails = snippet.thumbnails || {};
-        const cover = thumbnails.high?.url || thumbnails.medium?.url || thumbnails.default?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
+        const videoId = item.contentDetails.videoId;
+        const cover = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
         
         return {
-          id: item.contentDetails.videoId,
+          id: videoId,
           title: snippet.title || 'Nieznany tytuł',
           artist: snippet.videoOwnerChannelTitle || snippet.channelTitle || 'Nieznany wykonawca',
           cover,
           duration: 240, // placeholder
           source: 'youtube' as const,
-          videoId: item.contentDetails.videoId,
+          videoId,
           tag: 'YouTube Playlist'
         };
       });
