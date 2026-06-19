@@ -2,6 +2,10 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import type { Track, Playlist, OmniConfig } from '../types';
 import { musicEngine } from '../services/MusicEngine';
 import { searchYouTube, scrapeYouTubePlaylist } from '../utils/youtube';
+import { 
+  checkUrlForSpotifyToken, getSpotifyToken, logoutSpotify as spotifyLogout, 
+  loginWithSpotify as spotifyLogin, getSpotifyUserProfile 
+} from '../utils/spotify';
 
 interface OmniContextType {
   // Config
@@ -53,6 +57,12 @@ interface OmniContextType {
   // Localization
   language: 'pl' | 'en';
   setLanguage: (lang: 'pl' | 'en') => void;
+
+  // Spotify Authentication
+  spotifyToken: string | null;
+  spotifyUser: { name: string; image: string } | null;
+  loginWithSpotify: () => void;
+  logoutSpotify: () => void;
 }
 
 const OmniContext = createContext<OmniContextType | undefined>(undefined);
@@ -144,6 +154,47 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const saved = localStorage.getItem('omni_history');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Spotify Authentication States
+  const [spotifyToken, setSpotifyToken] = useState<string | null>(() => getSpotifyToken());
+  const [spotifyUser, setSpotifyUserState] = useState<{ name: string; image: string } | null>(() => {
+    const name = localStorage.getItem('spotify_user_name');
+    const image = localStorage.getItem('spotify_user_image') || '';
+    return name ? { name, image } : null;
+  });
+
+  // Handle Spotify redirect callback token check on mount
+  useEffect(() => {
+    const token = checkUrlForSpotifyToken();
+    if (token) {
+      setSpotifyToken(token);
+      fetchUserProfile(token);
+    } else {
+      const activeToken = getSpotifyToken();
+      if (activeToken && !spotifyUser) {
+        fetchUserProfile(activeToken);
+      }
+    }
+  }, []);
+
+  const fetchUserProfile = async (token: string) => {
+    const profile = await getSpotifyUserProfile(token);
+    if (profile) {
+      setSpotifyUserState(profile);
+      localStorage.setItem('spotify_user_name', profile.name);
+      localStorage.setItem('spotify_user_image', profile.image);
+    }
+  };
+
+  const loginWithSpotify = () => {
+    spotifyLogin();
+  };
+
+  const logoutSpotify = () => {
+    spotifyLogout();
+    setSpotifyToken(null);
+    setSpotifyUserState(null);
+  };
 
   // Ref to hold current state to prevent stale closure issues in event listeners
   const playbackRef = useRef({ queue, queueIndex, shuffle, repeatMode, currentTrack, config });
@@ -466,6 +517,10 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addToHistory={addToHistory}
       language={language}
       setLanguage={setLanguage}
+      spotifyToken={spotifyToken}
+      spotifyUser={spotifyUser}
+      loginWithSpotify={loginWithSpotify}
+      logoutSpotify={logoutSpotify}
     >
       {children}
     </OmniProviderValueHelper>

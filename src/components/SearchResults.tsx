@@ -7,7 +7,7 @@ import { TrackCover } from './TrackCover';
 import { translations } from '../utils/translations';
 
 export const SearchResults: React.FC = () => {
-  const { searchQuery, playTrack, playlists, addTrackToPlaylist, currentTrack, isPlaying, language } = useOmni();
+  const { searchQuery, playTrack, playlists, addTrackToPlaylist, currentTrack, isPlaying, language, spotifyToken, loginWithSpotify } = useOmni();
   const { tracks, loading, error } = useOmniSearch(searchQuery);
   
   const [activeMenuTrackId, setActiveMenuTrackId] = useState<string | null>(null);
@@ -80,6 +80,31 @@ export const SearchResults: React.FC = () => {
 
   return (
     <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6">
+      {/* Spotify Connection Promo banner inside search if not logged in */}
+      {!spotifyToken && (
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in shrink-0">
+          <div className="space-y-1">
+            <h4 className="text-sm font-bold text-white flex items-center gap-2">
+              <svg viewBox="0 0 24 24" className="w-4.5 h-4.5 fill-emerald-400" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.565.387-.86.207-2.377-1.454-5.37-1.783-8.893-.982-.336.075-.668-.135-.744-.47-.077-.337.136-.669.47-.745 3.856-.88 7.15-.502 9.82 1.13.297.18.388.564.207.86zm1.224-2.723c-.226.367-.707.487-1.074.26-2.72-1.672-6.87-2.157-10.075-1.183-.413.125-.847-.107-.972-.52-.125-.413.107-.847.52-.972 3.666-1.112 8.232-.574 11.34 1.34.368.228.488.708.26 1.075zm.106-2.833C14.773 8.87 9.585 8.697 6.587 9.607c-.477.145-.978-.125-1.123-.603-.144-.478.125-.978.603-1.122 3.447-1.046 9.176-.846 12.793 1.302.43.256.57.813.314 1.242-.256.43-.813.57-1.242.314z"/>
+              </svg>
+              {language === 'pl' ? 'Połącz ze Spotify dla pełnych wyników!' : 'Connect Spotify for full results!'}
+            </h4>
+            <p className="text-xs text-gray-400">
+              {language === 'pl' 
+                ? 'Aktualnie wyszukujesz tylko na YouTube. Połącz konto Spotify, aby wyszukiwać utwory z bazy Spotify.'
+                : 'Currently searching only on YouTube. Connect Spotify to search tracks from Spotify catalog.'}
+            </p>
+          </div>
+          <button 
+            onClick={loginWithSpotify}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-xs font-extrabold text-white rounded-xl shadow-lg transition-all cursor-pointer select-none shrink-0"
+          >
+            {language === 'pl' ? 'Połącz konto' : 'Connect now'}
+          </button>
+        </div>
+      )}
+
       <div>
         <h2 className="text-2xl font-bold text-white tracking-wide">
           {language === 'pl' ? 'Wyniki Wyszukiwania' : 'Search Results'}
