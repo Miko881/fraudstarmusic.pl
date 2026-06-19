@@ -21,11 +21,6 @@ export const SearchResults: React.FC = () => {
     return `${mins}:${remaining.toString().padStart(2, '0')}`;
   };
 
-  const handlePlay = (track: Track) => {
-    // Mount the searched tracks as the active playback queue
-    playTrack(track, tracks);
-  };
-
   const handleAddToPlaylist = (playlistId: string, track: Track) => {
     addTrackToPlaylist(playlistId, track);
     const pl = playlists.find(p => p.id === playlistId);
@@ -145,130 +140,174 @@ export const SearchResults: React.FC = () => {
           {language === 'pl' ? 'Wyniki Wyszukiwania' : 'Search Results'}
         </h2>
         <p className="text-xs text-gray-500 mt-1">
-          {language === 'pl' 
-            ? 'Połączone wyniki z katalogu Spotify oraz wyszukiwarki YouTube' 
-            : 'Combined results from Spotify catalog and YouTube search'}
+          {searchSource === 'spotify' 
+            ? (language === 'pl' ? 'Wyniki z katalogu Spotify' : 'Results from Spotify catalog')
+            : searchSource === 'youtube'
+              ? (language === 'pl' ? 'Wyniki z wyszukiwarki YouTube' : 'Results from YouTube search')
+              : (language === 'pl' 
+                  ? 'Połączone wyniki z katalogu Spotify oraz wyszukiwarki YouTube' 
+                  : 'Combined results from Spotify catalog and YouTube search')}
         </p>
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
-        {/* Table Header */}
-        <div className="grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 sm:px-6 py-3 border-b border-white/5 text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-white/[0.01]">
-          <div className="w-8 text-center">#</div>
-          <div>{t.tracklistHeaderTitle}</div>
-          <div className="hidden sm:block">{t.tracklistHeaderArtist}</div>
-          <div className="w-16 text-center text-xs shrink-0">{t.tracklistHeaderSource}</div>
-          <div className="w-20 sm:w-24 text-right pr-2 sm:pr-6 shrink-0"><Clock size={12} className="inline" /></div>
-        </div>
+      {(() => {
+        const spotifyTracks = tracks.filter(t => t.source === 'spotify');
+        const youtubeTracks = tracks.filter(t => t.source === 'youtube');
 
-        {/* Tracks List */}
-        <div className="divide-y divide-white/[0.03]">
-          {tracks.map((track, index) => {
-            const isCurrent = currentTrack?.id === track.id;
-            const isTrackPlaying = isCurrent && isPlaying;
-            const menuOpen = activeMenuTrackId === track.id;
-
+        const renderSingleTable = (tableTracks: Track[], sourceTitle: string, themeColor: 'spotify' | 'youtube', tracksQueue: Track[]) => {
+          if (tableTracks.length === 0) {
             return (
-              <div 
-                key={track.id}
-                className={`grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 sm:px-6 py-3 items-center group transition-all duration-200 hover:bg-white/[0.02] ${
-                  isCurrent ? 'bg-white/[0.02]' : ''
-                }`}
-              >
-                {/* Index / Play Button */}
-                <div className="w-8 flex items-center justify-center relative">
-                  <span className={`text-xs text-gray-500 font-semibold group-hover:opacity-0 ${
-                    isCurrent ? 'text-omnicord-neon' : ''
-                  }`}>
-                    {index + 1}
-                  </span>
-                  <button 
-                    onClick={() => handlePlay(track)}
-                    className="absolute opacity-0 group-hover:opacity-100 text-omnicord-neon hover:scale-110 active:scale-95 transition-all"
-                  >
-                    <Play size={14} fill="#deff9a" className={isTrackPlaying ? "animate-pulse" : ""} />
-                  </button>
-                </div>
-
-                {/* Cover & Title */}
-                <div className="flex items-center gap-3 overflow-hidden min-w-0">
-                  <div className="w-10 h-10 rounded-lg bg-white/5 overflow-hidden shrink-0 border border-white/5 shadow-md">
-                    {track.cover ? (
-                      <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center"><Music size={16} className="text-gray-600" /></div>
-                    )}
-                  </div>
-                  <div className="overflow-hidden min-w-0 flex-1">
-                    <span className={`font-semibold text-sm truncate block tracking-wide ${
-                      isCurrent ? 'text-omnicord-neon glow-text-neon' : 'text-white'
-                    }`}>
-                      {track.title}
-                    </span>
-                    <span className="text-[11px] text-gray-400 truncate block sm:hidden mt-0.5 font-semibold">
-                      {track.artist}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Artist */}
-                <div className="hidden sm:block text-sm text-gray-400 truncate font-medium min-w-0">
-                  {track.artist}
-                </div>
-
-                {/* Source Badge */}
-                <div className="w-16 flex justify-center shrink-0">
-                  <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                    track.source === 'spotify' 
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                  }`}>
-                    {track.source}
-                  </span>
-                </div>
-
-                {/* Duration & Playlist Actions */}
-                <div className="w-20 sm:w-24 flex items-center justify-end gap-2 sm:gap-3 text-right text-xs font-semibold text-gray-400 relative shrink-0">
-                  <span>{formatDuration(track.duration)}</span>
-                  
-                  {/* Plus/Menu Button */}
-                  <div className="relative">
-                    <button 
-                      onClick={() => setActiveMenuTrackId(menuOpen ? null : track.id)}
-                      className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-all"
-                      title={t.addTo}
-                    >
-                      <Plus size={14} />
-                    </button>
-                    
-                    {/* Add to Playlist Dropdown */}
-                    {menuOpen && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setActiveMenuTrackId(null)} />
-                        <div className="absolute right-0 bottom-full mb-1.5 w-48 glass-panel rounded-xl border border-white/10 p-1.5 shadow-xl z-50 animate-fade-in text-left">
-                          <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest px-2.5 py-1">{t.addTo}:</div>
-                          <div className="max-h-36 overflow-y-auto space-y-0.5">
-                            {playlists.map((pl) => (
-                              <button
-                                key={pl.id}
-                                onClick={() => handleAddToPlaylist(pl.id, track)}
-                                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-colors truncate flex items-center justify-between"
-                              >
-                                <span>{getPlaylistName(pl)}</span>
-                                <PlusCircle size={10} className="text-gray-500" />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
+              <div className="p-6 text-center text-gray-500 text-xs italic">
+                {language === 'pl' ? 'Brak wyników z tego źródła' : 'No results from this source'}
               </div>
             );
-          })}
-        </div>
-      </div>
+          }
+
+          const isSpotify = themeColor === 'spotify';
+          const headerBorder = isSpotify ? 'border-emerald-500/20' : 'border-red-500/20';
+          const headerBg = isSpotify ? 'bg-emerald-500/[0.02]' : 'bg-red-500/[0.02]';
+
+          return (
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 pl-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${isSpotify ? 'bg-emerald-400 animate-pulse' : 'bg-red-500 animate-pulse'}`}></span>
+                <span className={isSpotify ? 'text-emerald-400' : 'text-red-400'}>{sourceTitle}</span>
+              </h3>
+              <div className={`glass-panel rounded-2xl border ${headerBorder} overflow-hidden shadow-lg`}>
+                {/* Table Header */}
+                <div className={`grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 sm:px-6 py-3 border-b ${headerBorder} text-[10px] font-bold text-gray-500 uppercase tracking-widest ${headerBg}`}>
+                  <div className="w-8 text-center">#</div>
+                  <div>{t.tracklistHeaderTitle}</div>
+                  <div className="hidden sm:block">{t.tracklistHeaderArtist}</div>
+                  <div className="w-16 text-center text-xs shrink-0">{t.tracklistHeaderSource}</div>
+                  <div className="w-20 sm:w-24 text-right pr-2 sm:pr-6 shrink-0"><Clock size={12} className="inline" /></div>
+                </div>
+
+                {/* Tracks List */}
+                <div className="divide-y divide-white/[0.03]">
+                  {tableTracks.map((track, index) => {
+                    const isCurrent = currentTrack?.id === track.id;
+                    const isTrackPlaying = isCurrent && isPlaying;
+                    const menuOpen = activeMenuTrackId === track.id;
+
+                    return (
+                      <div 
+                        key={track.id}
+                        className={`grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 sm:px-6 py-3 items-center group transition-all duration-200 hover:bg-white/[0.02] ${
+                          isCurrent ? 'bg-white/[0.02]' : ''
+                        }`}
+                      >
+                        {/* Index / Play Button */}
+                        <div className="w-8 flex items-center justify-center relative">
+                          <span className={`text-xs text-gray-500 font-semibold group-hover:opacity-0 ${
+                            isCurrent ? (isSpotify ? 'text-emerald-400' : 'text-red-400') : ''
+                          }`}>
+                            {index + 1}
+                          </span>
+                          <button 
+                            onClick={() => playTrack(track, tracksQueue)}
+                            className="absolute opacity-0 group-hover:opacity-100 text-omnicord-neon hover:scale-110 active:scale-95 transition-all"
+                          >
+                            <Play size={14} fill="#deff9a" className={isTrackPlaying ? "animate-pulse" : ""} />
+                          </button>
+                        </div>
+
+                        {/* Cover & Title */}
+                        <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                          <div className="w-10 h-10 rounded-lg bg-white/5 overflow-hidden shrink-0 border border-white/5 shadow-md">
+                            {track.cover ? (
+                              <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center"><Music size={16} className="text-gray-600" /></div>
+                            )}
+                          </div>
+                          <div className="overflow-hidden min-w-0 flex-1">
+                            <span className={`font-semibold text-sm truncate block tracking-wide ${
+                              isCurrent ? (isSpotify ? 'text-emerald-400 glow-text-emerald' : 'text-red-400 glow-text-red') : 'text-white'
+                            }`}>
+                              {track.title}
+                            </span>
+                            <span className="text-[11px] text-gray-400 truncate block sm:hidden mt-0.5 font-semibold">
+                              {track.artist}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Artist */}
+                        <div className="hidden sm:block text-sm text-gray-400 truncate font-medium min-w-0">
+                          {track.artist}
+                        </div>
+
+                        {/* Source Badge */}
+                        <div className="w-16 flex justify-center shrink-0">
+                          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            track.source === 'spotify' 
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                              : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                          }`}>
+                            {track.source}
+                          </span>
+                        </div>
+
+                        {/* Duration & Playlist Actions */}
+                        <div className="w-20 sm:w-24 flex items-center justify-end gap-2 sm:gap-3 text-right text-xs font-semibold text-gray-400 relative shrink-0">
+                          <span>{formatDuration(track.duration)}</span>
+                          
+                          {/* Plus/Menu Button */}
+                          <div className="relative">
+                            <button 
+                              onClick={() => setActiveMenuTrackId(menuOpen ? null : track.id)}
+                              className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-all"
+                              title={t.addTo}
+                            >
+                              <Plus size={14} />
+                            </button>
+                            
+                            {/* Add to Playlist Dropdown */}
+                            {menuOpen && (
+                              <>
+                                <div className="fixed inset-0 z-40" onClick={() => setActiveMenuTrackId(null)} />
+                                <div className="absolute right-0 bottom-full mb-1.5 w-48 glass-panel rounded-xl border border-white/10 p-1.5 shadow-xl z-50 animate-fade-in text-left">
+                                  <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest px-2.5 py-1">{t.addTo}:</div>
+                                  <div className="max-h-36 overflow-y-auto space-y-0.5">
+                                    {playlists.map((pl) => (
+                                      <button
+                                        key={pl.id}
+                                        onClick={() => handleAddToPlaylist(pl.id, track)}
+                                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-colors truncate flex items-center justify-between"
+                                      >
+                                        <span>{getPlaylistName(pl)}</span>
+                                        <PlusCircle size={10} className="text-gray-500" />
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        if (searchSource === 'both') {
+          return (
+            <div className="space-y-8">
+              {renderSingleTable(spotifyTracks.slice(0, 5), 'Spotify catalog', 'spotify', spotifyTracks)}
+              {renderSingleTable(youtubeTracks.slice(0, 5), 'YouTube Search', 'youtube', youtubeTracks)}
+            </div>
+          );
+        } else if (searchSource === 'spotify') {
+          return renderSingleTable(spotifyTracks, 'Spotify catalog', 'spotify', spotifyTracks);
+        } else {
+          return renderSingleTable(youtubeTracks, 'YouTube Search', 'youtube', youtubeTracks);
+        }
+      })()}
 
       {/* Floating Add Toast Notification */}
       {addedMessage && (

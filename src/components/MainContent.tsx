@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useOmni } from '../context/OmniProvider';
 import type { Track } from '../types';
 import { searchYouTube, getYouTubeRecommendations } from '../utils/youtube';
-import { getSpotifyRecommendations } from '../utils/spotify';
+import { getSpotifyRecommendations, searchSpotify } from '../utils/spotify';
 import { translations } from '../utils/translations';
 import { 
   Search, Play, Clock, Trash2, 
   Sparkles, Flame, Compass, Disc, Library, RefreshCw, Music,
-  ThumbsUp 
+  ThumbsUp, X
 } from 'lucide-react';
 import { SearchResults } from './SearchResults';
 import { TrackCover } from './TrackCover';
@@ -152,16 +152,44 @@ export const MainContent: React.FC = () => {
     setCategoryLoading(true);
     setActiveCategory(cat);
     try {
-      let query = 'music';
+      let ytQuery = 'music';
+      let spotifyQuery = 'music';
+      
       if (cat === 'Trending') {
-        query = language === 'pl' ? 'muzyka hity pl' : 'trending music hits';
+        ytQuery = language === 'pl' ? 'muzyka hity pl' : 'trending music hits';
+        spotifyQuery = language === 'pl' ? 'hity pl' : 'top hits';
       } else if (cat === 'Discovery') {
-        query = language === 'pl' ? 'nowe wydania muzyczne' : 'new music releases';
+        ytQuery = language === 'pl' ? 'nowe wydania muzyczne' : 'new music releases';
+        spotifyQuery = language === 'pl' ? 'nowe wydania' : 'new releases';
       } else if (cat === 'Mix') {
-        query = language === 'pl' ? 'składanka muzyczna mix' : 'lofi chill music mix';
+        ytQuery = language === 'pl' ? 'składanka muzyczna mix' : 'lofi chill music mix';
+        spotifyQuery = language === 'pl' ? 'składanka chillout' : 'chill mix';
       }
-      const tracks = await searchYouTube(query);
-      setCategoryTracks(tracks);
+
+      const promises: Promise<Track[]>[] = [];
+      promises.push(searchYouTube(ytQuery));
+
+      if (spotifyToken) {
+        promises.push(searchSpotify(spotifyQuery));
+      }
+
+      const results = await Promise.all(promises);
+      const ytTracks = results[0] || [];
+      const spotifyTracks = results[1] || [];
+
+      // Merge and de-duplicate (Spotify first for clean metadata, then YouTube)
+      const merged: Track[] = [...spotifyTracks];
+      const seen = new Set(spotifyTracks.map(t => `${t.title.toLowerCase().trim()}-${t.artist.toLowerCase().trim()}`));
+      
+      for (const t of ytTracks) {
+        const key = `${t.title.toLowerCase().trim()}-${t.artist.toLowerCase().trim()}`;
+        if (!seen.has(key)) {
+          merged.push(t);
+          seen.add(key);
+        }
+      }
+
+      setCategoryTracks(merged);
     } catch (e) {
       console.error(e);
     } finally {
@@ -211,8 +239,20 @@ export const MainContent: React.FC = () => {
               }
             }}
             placeholder={t.searchPlaceholder}
-            className="w-full glass-input !pl-11 bg-white/[0.02]"
+            className="w-full glass-input !pl-11 !pr-10 bg-white/[0.02]"
           />
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setActiveView('start');
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-all cursor-pointer p-1.5 rounded-lg hover:bg-white/5 active:scale-95"
+              title={language === 'pl' ? 'Wyczyść wyszukiwanie' : 'Clear search'}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
         
         {/* Source selector buttons */}
