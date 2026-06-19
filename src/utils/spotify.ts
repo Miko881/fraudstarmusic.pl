@@ -38,7 +38,10 @@ export async function loginWithSpotify() {
 
   const challenge = await generateCodeChallenge(verifier);
   const redirectUri = encodeURIComponent(getRedirectUri());
-  const scopes = encodeURIComponent('user-read-private user-read-email');
+  // 'streaming' + 'user-modify-playback-state' are REQUIRED for Web Playback SDK
+  const scopes = encodeURIComponent(
+    'streaming user-read-private user-read-email user-modify-playback-state user-read-playback-state'
+  );
   
   window.location.href = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${redirectUri}&code_challenge_method=S256&code_challenge=${challenge}&scope=${scopes}&show_dialog=true`;
 }
