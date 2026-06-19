@@ -4,8 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Omnicord</title>
-    
-    <meta name="description" content="Omnicord - Potęga hybrydy łącząca wyszukiwanie piosenek ze Spotify oraz YouTube Music w jednym odtwarzaczu." />
+
+    <!-- OpenGraph / Discord embed — language-aware via ?lang=en -->
+    <meta name="description" content="Omnicord — Potęga hybrydy łącząca wyszukiwanie piosenek ze Spotify oraz YouTube Music w jednym odtwarzaczu." />
+    <meta property="og:site_name" content="Omnicord" />
     <meta property="og:title" content="Omnicord" />
     <meta property="og:description" content="Zintegrowane hybrydowe wyszukiwanie z katalogów Spotify i YouTube w jednym odtwarzaczu z płynnym crossfadem." />
     <meta property="og:type" content="website" />
@@ -14,9 +16,33 @@
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1024" />
     <meta property="og:image:height" content="1024" />
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Omnicord" />
+    <meta name="twitter:description" content="Zintegrowane hybrydowe wyszukiwanie z katalogów Spotify i YouTube w jednym odtwarzaczu z płynnym crossfadem." />
     <meta name="twitter:image" content="https://mikokohai.pl/og-image.png" />
     <meta name="theme-color" content="#050505" />
+
+    <!-- Dynamically update OG tags based on ?lang=en query param -->
+    <script>
+      (function() {
+        var params = new URLSearchParams(window.location.search);
+        var lang = params.get('lang');
+        if (lang === 'en') {
+          document.documentElement.setAttribute('lang', 'en');
+          document.title = 'Omnicord';
+          var metaDesc = document.querySelector('meta[name="description"]');
+          var ogDesc = document.querySelector('meta[property="og:description"]');
+          var ogTitle = document.querySelector('meta[property="og:title"]');
+          var twitterDesc = document.querySelector('meta[name="twitter:description"]');
+          var twitterTitle = document.querySelector('meta[name="twitter:title"]');
+          if (metaDesc) metaDesc.setAttribute('content', 'Omnicord — Hybrid power combining Spotify catalog search and YouTube Music in one seamless player with crossfade.');
+          if (ogDesc) ogDesc.setAttribute('content', 'Integrated hybrid search from Spotify and YouTube Music catalogs in one player with smooth crossfade.');
+          if (ogTitle) ogTitle.setAttribute('content', 'Omnicord');
+          if (twitterDesc) twitterDesc.setAttribute('content', 'Integrated hybrid search from Spotify and YouTube Music catalogs in one player with smooth crossfade.');
+          if (twitterTitle) twitterTitle.setAttribute('content', 'Omnicord');
+        }
+      })();
+    </script>
 
     <!-- Google Fonts (Outfit) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,7 +50,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <script type="module" crossorigin src="./assets/index-Ci3fQx1e.js"></script>
+    <script type="module" crossorigin src="./assets/index-BWnv3qV_.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-DBdcTh2k.css">
   </head>
   <body class="bg-[#050505] text-gray-300 font-outfit select-none overflow-hidden antialiased">
