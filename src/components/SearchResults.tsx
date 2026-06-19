@@ -72,6 +72,34 @@ export const SearchResults: React.FC = () => {
     );
   }
 
+  if (searchSource === 'spotify' && !spotifyToken) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center p-8 min-h-[400px] space-y-6 max-w-md mx-auto animate-fade-in animate-duration-300">
+        <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.15)] shrink-0">
+          <svg viewBox="0 0 24 24" className="w-8 h-8 fill-emerald-400" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.565.387-.86.207-2.377-1.454-5.37-1.783-8.893-.982-.336.075-.668-.135-.744-.47-.077-.337.136-.669.47-.745 3.856-.88 7.15-.502 9.82 1.13.297.18.388.564.207.86zm1.224-2.723c-.226.367-.707.487-1.074.26-2.72-1.672-6.87-2.157-10.075-1.183-.413.125-.847-.107-.972-.52-.125-.413.107-.847.52-.972 3.666-1.112 8.232-.574 11.34 1.34.368.228.488.708.26 1.075zm.106-2.833C14.773 8.87 9.585 8.697 6.587 9.607c-.477.145-.978-.125-1.123-.603-.144-.478.125-.978.603-1.122 3.447-1.046 9.176-.846 12.793 1.302.43.256.57.813.314 1.242-.256.43-.813.57-1.242.314z"/>
+          </svg>
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-xl font-extrabold text-white tracking-wide">
+            {language === 'pl' ? 'Połącz konto Spotify' : 'Connect Spotify Account'}
+          </h3>
+          <p className="text-sm text-gray-400 leading-relaxed font-medium">
+            {language === 'pl'
+              ? 'Wybrałeś wyszukiwanie z samego źródła Spotify. Aby móc wyszukiwać i odtwarzać utwory bezpośrednio ze Spotify, musisz połączyć swoje konto Spotify Premium.'
+              : 'You selected searching only from Spotify source. To search and play tracks directly from Spotify, you need to connect your Spotify Premium account.'}
+          </p>
+        </div>
+        <button
+          onClick={loginWithSpotify}
+          className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-xs font-extrabold text-white rounded-xl shadow-lg transition-all cursor-pointer select-none shrink-0"
+        >
+          {language === 'pl' ? 'Połącz konto' : 'Connect now'}
+        </button>
+      </div>
+    );
+  }
+
   if (tracks.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-6 min-h-[400px]">

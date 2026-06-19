@@ -11,7 +11,7 @@ interface SearchResults {
 }
 
 export function useOmniSearch(query: string): SearchResults {
-  const { searchSource } = useOmni();
+  const { searchSource, spotifyToken } = useOmni();
   const [results, setResults] = useState<SearchResults>({
     tracks: [],
     loading: false,
@@ -21,6 +21,13 @@ export function useOmniSearch(query: string): SearchResults {
   useEffect(() => {
     const cleanQuery = query.trim().substring(0, 100);
     if (!cleanQuery || cleanQuery.length < 2) {
+      setResults({ tracks: [], loading: false, error: null });
+      return;
+    }
+
+    // If Spotify is selected as the sole search source but user is not logged in,
+    // do not search anything and do not trigger YouTube/Invidious fallback.
+    if (searchSource === 'spotify' && !spotifyToken) {
       setResults({ tracks: [], loading: false, error: null });
       return;
     }
@@ -35,7 +42,8 @@ export function useOmniSearch(query: string): SearchResults {
         let youtubeResults: Track[] = [];
         const promises: Promise<any>[] = [];
 
-        if (searchSource === 'both' || searchSource === 'spotify') {
+        // Strictly search Spotify only if logged in
+        if (spotifyToken && (searchSource === 'both' || searchSource === 'spotify')) {
           promises.push(searchSpotify(cleanQuery).then(res => { spotifyResults = res; }));
         }
         if (searchSource === 'both' || searchSource === 'youtube') {

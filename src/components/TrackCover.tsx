@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Music } from 'lucide-react';
 
 interface TrackCoverProps {
@@ -14,6 +14,11 @@ interface TrackCoverProps {
 export const TrackCover: React.FC<TrackCoverProps> = ({ src, alt, className = '' }) => {
   const [currentSrc, setCurrentSrc] = useState(src);
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setCurrentSrc(src);
+    setFailed(false);
+  }, [src]);
 
   const handleError = () => {
     // Extract videoId from YouTube thumbnail URL
