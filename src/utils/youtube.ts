@@ -17,6 +17,37 @@ function unescapeYTResponse(dataEscaped: string): string {
 }
 
 /**
+ * Robust fetch helper that rotates between public CORS proxies in production to avoid 403 limits
+ */
+async function fetchHtmlWithFallbackProxies(targetUrl: string): Promise<string> {
+  const proxies = [
+    // 1. AllOrigins (Stable, good uptime)
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+    // 2. Corsproxy.io (Default fallback)
+    `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+    // 3. ThingProxy (Simple relay)
+    `https://thingproxy.freeboard.io/fetch/${targetUrl}`
+  ];
+
+  let lastError: any = new Error("All proxies failed");
+  for (const proxyUrl of proxies) {
+    try {
+      const response = await fetch(proxyUrl);
+      if (response.ok) {
+        const text = await response.text();
+        // Basic check to ensure we got a valid response (not a proxy error shell)
+        if (text && text.length > 500 && !text.includes("CORS Proxy Error") && !text.includes("403 Forbidden")) {
+          return text;
+        }
+      }
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
+}
+
+/**
  * Recursive collector that extracts music items from YouTube Music Initial Data structure
  */
 function collectTracksFromYTMusic(obj: any, tracks: Track[] = []): Track[] {
@@ -158,19 +189,17 @@ function collectTracksFromYTMusic(obj: any, tracks: Track[] = []): Track[] {
  */
 async function searchWithScraper(query: string): Promise<Track[]> {
   try {
-    // Environment-aware proxy URL to bypass CORS.
-    // In local development, we use our Vite config dev-server proxy.
-    // In production (GitHub Pages), we use a stable public CORS proxy (corsproxy.io).
     const isDev = import.meta.env.DEV;
-    const proxyUrl = isDev
-      ? `/api/ytm/search?q=${encodeURIComponent(query)}&gl=US&hl=en`
-      : `https://corsproxy.io/?${encodeURIComponent(
-        `https://music.youtube.com/search?q=${encodeURIComponent(query)}&gl=US&hl=en`
-      )}`;
-
-    const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error("Proxy fetch failed");
-    const html = await response.text();
+    let html = '';
+    
+    if (isDev) {
+      const response = await fetch(`/api/ytm/search?q=${encodeURIComponent(query)}&gl=US&hl=en`);
+      if (!response.ok) throw new Error("Local proxy fetch failed");
+      html = await response.text();
+    } else {
+      const targetUrl = `https://music.youtube.com/search?q=${encodeURIComponent(query)}&gl=US&hl=en`;
+      html = await fetchHtmlWithFallbackProxies(targetUrl);
+    }
 
     const tracks: Track[] = [];
 
@@ -306,14 +335,16 @@ export function extractPlaylistId(input: string): string | null {
 export async function scrapeYouTubePlaylist(playlistId: string): Promise<{ name: string; description: string; tracks: Track[] }> {
   try {
     const isDev = import.meta.env.DEV;
-    const playlistUrl = `https://music.youtube.com/playlist?list=${playlistId}`;
-    const proxyUrl = isDev
-      ? `/api/ytm/playlist?list=${playlistId}`
-      : `https://corsproxy.io/?${encodeURIComponent(playlistUrl)}`;
-
-    const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error("Failed to fetch playlist page");
-    const html = await response.text();
+    let html = '';
+    
+    if (isDev) {
+      const response = await fetch(`/api/ytm/playlist?list=${playlistId}`);
+      if (!response.ok) throw new Error("Local playlist proxy fetch failed");
+      html = await response.text();
+    } else {
+      const playlistUrl = `https://music.youtube.com/playlist?list=${playlistId}`;
+      html = await fetchHtmlWithFallbackProxies(playlistUrl);
+    }
 
     const tracks: Track[] = [];
 
