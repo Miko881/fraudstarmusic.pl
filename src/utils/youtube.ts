@@ -1,73 +1,110 @@
 import type { Track } from '../types';
 
-// Multiple Piped API instances for failover
-// Piped is an open-source YouTube frontend with a public API that supports CORS
-const PIPED_INSTANCES = [
-  'https://pipedapi.kavin.rocks',
-  'https://piped-api.garudalinux.org',
-  'https://api.piped.projectsegfau.lt',
+// Multiple Invidious instances — open-source YouTube frontend with proper CORS headers
+// Unlike Piped, Invidious is specifically designed to allow cross-origin requests
+const INVIDIOUS_INSTANCES = [
+  'https://iv.ggtyler.dev',
+  'https://invidious.nerdvpn.de',
+  'https://invidious.lunar.icu',
+  'https://inv.nadeko.net',
+  'https://invidious.privacydev.net',
 ];
 
-/**
- * Fetch from Piped API with automatic instance failover
- */
-async function pipedFetch(path: string): Promise<any> {
-  let lastError: any = new Error('All Piped instances failed');
-  for (const base of PIPED_INSTANCES) {
-    try {
-      const res = await fetch(`${base}${path}`, {
-        headers: { 'Content-Type': 'application/json' }
+// Simple request queue to avoid rate limiting from concurrent calls
+let activeRequests = 0;
+const MAX_CONCURRENT = 2;
+const pendingQueue: Array<() => void> = [];
+
+function throttledFetch(): Promise<void> {
+  return new Promise(resolve => {
+    if (activeRequests < MAX_CONCURRENT) {
+      activeRequests++;
+      resolve();
+    } else {
+      pendingQueue.push(() => {
+        activeRequests++;
+        resolve();
       });
-      if (res.ok) {
-        const json = await res.json();
-        return json;
-      }
-    } catch (e) {
-      lastError = e;
     }
+  });
+}
+
+function releaseFetch() {
+  activeRequests--;
+  if (pendingQueue.length > 0) {
+    const next = pendingQueue.shift();
+    if (next) next();
   }
-  throw lastError;
 }
 
 /**
- * Map a Piped stream item to our Track type
+ * Fetch from Invidious API with automatic instance failover
  */
-function pipedStreamToTrack(item: any): Track | null {
-  // url looks like "/watch?v=VIDEO_ID"
-  const videoId = item.url?.split('v=')?.[1]?.split('&')?.[0];
+async function invidiousFetch(path: string): Promise<any> {
+  await throttledFetch();
+  try {
+    let lastError: any = new Error('All Invidious instances failed');
+    for (const base of INVIDIOUS_INSTANCES) {
+      try {
+        const res = await fetch(`${base}${path}`);
+        if (res.ok) {
+          const json = await res.json();
+          return json;
+        }
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError;
+  } finally {
+    releaseFetch();
+  }
+}
+
+/**
+ * Map an Invidious video item to our Track type
+ */
+function invidiousVideoToTrack(item: any): Track | null {
+  const videoId = item.videoId;
   if (!videoId || !item.title) return null;
 
-  // Piped thumbnails from pipedimg.kavin.rocks sometimes have ?host= params
-  let cover = item.thumbnail || '';
+  // Best available thumbnail
+  const thumbnails: any[] = item.videoThumbnails || [];
+  const thumb = thumbnails.find((t: any) => t.quality === 'medium') ||
+                thumbnails.find((t: any) => t.quality === 'high') ||
+                thumbnails[0];
+  const cover = thumb?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
   return {
     id: `yt-${videoId}`,
     title: item.title,
-    artist: item.uploaderName || 'YouTube',
+    artist: item.author || 'YouTube',
     cover,
-    duration: item.duration || 210,
+    duration: item.lengthSeconds || 210,
     source: 'youtube' as const,
     videoId,
   };
 }
 
 /**
- * Search YouTube via Piped API (JSON, no CORS issues)
+ * Search YouTube via Invidious API (proper CORS, no proxy needed)
  */
-async function searchWithPiped(query: string): Promise<Track[]> {
+async function searchWithInvidious(query: string): Promise<Track[]> {
   try {
-    const data = await pipedFetch(`/search?q=${encodeURIComponent(query)}&filter=videos`);
-    if (!data?.items || !Array.isArray(data.items)) return getMockSearchResults(query);
+    const data = await invidiousFetch(
+      `/api/v1/search?q=${encodeURIComponent(query)}&type=video&sort_by=relevance`
+    );
+    if (!Array.isArray(data)) return getMockSearchResults(query);
 
-    const tracks: Track[] = data.items
-      .filter((item: any) => item.type === 'stream' || item.duration)
-      .map(pipedStreamToTrack)
+    const tracks: Track[] = data
+      .filter((item: any) => item.type === 'video' && item.videoId)
+      .map(invidiousVideoToTrack)
       .filter(Boolean) as Track[];
 
     if (tracks.length === 0) return getMockSearchResults(query);
     return tracks.slice(0, 10);
   } catch (error) {
-    console.error('Piped search failed:', error);
+    console.error('Invidious search failed:', error);
     return getMockSearchResults(query);
   }
 }
@@ -120,7 +157,7 @@ function getMockSearchResults(query: string): Track[] {
 
 export async function searchYouTube(query: string): Promise<Track[]> {
   if (!query || query.trim().length === 0) return [];
-  return searchWithPiped(query);
+  return searchWithInvidious(query);
 }
 
 export function extractPlaylistId(input: string): string | null {
@@ -132,7 +169,7 @@ export function extractPlaylistId(input: string): string | null {
     return match[1];
   }
 
-  // Match standard ID format (usually starts with PL or similar, 18 to 34 chars)
+  // Match standard ID format (18 to 34 chars)
   if (/^[a-zA-Z0-9_-]{18,34}$/.test(trimmed)) {
     return trimmed;
   }
@@ -142,22 +179,19 @@ export function extractPlaylistId(input: string): string | null {
 
 export async function scrapeYouTubePlaylist(playlistId: string): Promise<{ name: string; description: string; tracks: Track[] }> {
   try {
-    const data = await pipedFetch(`/playlists/${playlistId}`);
+    const data = await invidiousFetch(`/api/v1/playlists/${playlistId}`);
 
-    const tracks: Track[] = (data.relatedStreams || [])
-      .map(pipedStreamToTrack)
+    const tracks: Track[] = (data.videos || [])
+      .map(invidiousVideoToTrack)
       .filter(Boolean) as Track[];
 
-    const name = data.name || 'Zaimportowana Playlista';
-    const description = data.shortDescription || 'Import z YouTube';
-
     return {
-      name,
-      description,
+      name: data.title || 'Zaimportowana Playlista',
+      description: data.description || 'Import z YouTube',
       tracks: tracks.map(t => ({ ...t, source: 'youtube' as const }))
     };
   } catch (error) {
-    console.error('Piped playlist fetch failed:', error);
+    console.error('Invidious playlist fetch failed:', error);
     throw error;
   }
 }

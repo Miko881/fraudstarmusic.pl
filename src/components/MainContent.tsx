@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOmni } from '../context/OmniProvider';
 import type { Track } from '../types';
 import { getSpotifyCategoryTracks } from '../utils/spotify';
-
+import { searchYouTube } from '../utils/youtube';
 import { 
   Search, Play, Clock, Trash2, 
   Sparkles, Flame, Compass, Disc, Library, RefreshCw, Music,
@@ -22,26 +22,61 @@ export const MainContent: React.FC = () => {
   const [categoryLoading, setCategoryLoading] = useState(false);
   const [activeCategory, setActiveCategory] = useState<'Discovery' | 'Trending' | 'Mix'>('Trending');
 
-  // Mood state (pills UI only, no API fetch)
+  // Mood state
   const [activeMood, setActiveMood] = useState<string | null>(null);
-  const moodTracks: Track[] = [];
-  const moodLoading = false;
+  const [moodTracks, setMoodTracks] = useState<Track[]>([]);
+  const [moodLoading, setMoodLoading] = useState(false);
 
-  // Recommendation state (disabled — no backend API)
-  const recTracks: Track[] = [];
-  const recLoading = false;
-  
-  // Track list formatting helper
+  // Recommendation state
+  const [recTracks, setRecTracks] = useState<Track[]>([]);
+  const [recLoading, setRecLoading] = useState(false);
+
+  const lastPlayedArtist = history && history.length > 0 ? history[0].artist : null;
+
+  useEffect(() => {
+    if (activeMood) {
+      loadMoodTracks(activeMood);
+    } else {
+      setMoodTracks([]);
+    }
+  }, [activeMood]);
+
+  useEffect(() => {
+    if (lastPlayedArtist) {
+      loadRecTracks(lastPlayedArtist);
+    } else {
+      setRecTracks([]);
+    }
+  }, [lastPlayedArtist]);
+
+  const loadMoodTracks = async (mood: string) => {
+    setMoodLoading(true);
+    try {
+      const tracks = await searchYouTube(`${mood} muzyka`);
+      setMoodTracks(tracks);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setMoodLoading(false);
+    }
+  };
+
+  const loadRecTracks = async (artist: string) => {
+    setRecLoading(true);
+    try {
+      const tracks = await searchYouTube(artist);
+      setRecTracks(tracks.slice(0, 10));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRecLoading(false);
+    }
+  };
   const formatDuration = (secs: number) => {
     const mins = Math.floor(secs / 60);
     const remaining = secs % 60;
     return `${mins}:${remaining.toString().padStart(2, '0')}`;
   };
-
-
-
-  // Mood and recommendation auto-fetch disabled (no backend API configured)
-  // Manual search via search bar still works fully
 
   // Load Spotify Category tracks dynamically when activeView or category changes
   useEffect(() => {
