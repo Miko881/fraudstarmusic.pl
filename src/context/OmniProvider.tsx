@@ -197,7 +197,23 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
     spotifyLogout();
     setSpotifyToken(null);
     setSpotifyUserState(null);
+    musicEngine.setSpotifyToken(null);
   };
+
+  // Sync Spotify token to MusicEngine whenever it changes
+  useEffect(() => {
+    musicEngine.setSpotifyToken(spotifyToken);
+  }, [spotifyToken]);
+
+  // Listen for Spotify token expiry from MusicEngine
+  useEffect(() => {
+    const handleTokenExpired = () => {
+      console.warn('Spotify token expired, logging out...');
+      logoutSpotify();
+    };
+    window.addEventListener('omni-spotify-token-expired', handleTokenExpired);
+    return () => window.removeEventListener('omni-spotify-token-expired', handleTokenExpired);
+  }, []);
 
   // Ref to hold current state to prevent stale closure issues in event listeners
   const playbackRef = useRef({ queue, queueIndex, shuffle, repeatMode, currentTrack, config });
@@ -302,7 +318,11 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const playTrack = async (track: Track, newQueue?: Track[]) => {
     try {
       let resolved = track;
-      if (!track.videoId || track.videoId.startsWith('itq-') || (track.source === 'spotify' && !track.videoId)) {
+
+      // Spotify tracks: play directly via Spotify Web Playback SDK — no YouTube resolve needed
+      const isSpotifyTrack = track.source === 'spotify';
+
+      if (!isSpotifyTrack && (!track.videoId || track.videoId.startsWith('itq-'))) {
         resolved = await resolveTrack(track);
       }
 
@@ -316,7 +336,6 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (idx !== -1) {
           setQueueIndex(idx);
         } else {
-          // Add to queue right after current index
           const newQ = [...queue];
           const insertIdx = queueIndex + 1;
           newQ.splice(insertIdx, 0, resolved);
@@ -329,7 +348,11 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await musicEngine.play(resolved);
       addToHistory(resolved);
     } catch (e) {
-      alert(`Nie można odtworzyć utworu: ${track.title}. Brak połączenia z YouTube.`);
+      if (track.source === 'spotify') {
+        alert(`Nie można odtworzyć '${track.title}' przez Spotify. Sprawdź czy jesteś zalogowany/a i masz aktywne Spotify Premium.`);
+      } else {
+        alert(`Nie można odtworzyć utworu: ${track.title}. Brak połączenia z YouTube.`);
+      }
     }
   };
 
