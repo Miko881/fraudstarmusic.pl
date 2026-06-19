@@ -3,7 +3,7 @@ import type { Track, Playlist, OmniConfig } from '../types';
 import { musicEngine } from '../services/MusicEngine';
 import { searchYouTube, scrapeYouTubePlaylist } from '../utils/youtube';
 import { 
-  checkUrlForSpotifyToken, getSpotifyToken, logoutSpotify as spotifyLogout, 
+  checkUrlForSpotifyCode, getSpotifyToken, logoutSpotify as spotifyLogout, 
   loginWithSpotify as spotifyLogin, getSpotifyUserProfile 
 } from '../utils/spotify';
 
@@ -165,16 +165,19 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Handle Spotify redirect callback token check on mount
   useEffect(() => {
-    const token = checkUrlForSpotifyToken();
-    if (token) {
-      setSpotifyToken(token);
-      fetchUserProfile(token);
-    } else {
-      const activeToken = getSpotifyToken();
-      if (activeToken && !spotifyUser) {
-        fetchUserProfile(activeToken);
+    const handleAuthCallback = async () => {
+      const token = await checkUrlForSpotifyCode();
+      if (token) {
+        setSpotifyToken(token);
+        fetchUserProfile(token);
+      } else {
+        const activeToken = getSpotifyToken();
+        if (activeToken && !spotifyUser) {
+          fetchUserProfile(activeToken);
+        }
       }
-    }
+    };
+    handleAuthCallback();
   }, []);
 
   const fetchUserProfile = async (token: string) => {

@@ -11,34 +11,92 @@ export function getRedirectUri(): string {
   return 'https://mikokohai.pl/';
 }
 
-// Redirect user to Spotify Login
-export function loginWithSpotify() {
-  const redirectUri = encodeURIComponent(getRedirectUri());
-  const scopes = encodeURIComponent('user-read-private user-read-email playlist-read-private');
-  
-  window.location.href = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&redirect_uri=${redirectUri}&scope=${scopes}&response_type=token&show_dialog=true`;
+// Generate a random string for PKCE code verifier
+function generateCodeVerifier(length: number): string {
+  let text = '';
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  for (let i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
 }
 
-// Extract Spotify access token from URL fragment
-export function checkUrlForSpotifyToken(): string | null {
-  const hash = window.location.hash;
-  if (!hash) return null;
+// Generate code challenge from verifier using SHA-256
+async function generateCodeChallenge(codeVerifier: string): string {
+  const data = new TextEncoder().encode(codeVerifier);
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode.apply(null, [...new Uint8Array(digest)]))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
 
-  const params = new URLSearchParams(hash.substring(1));
-  const token = params.get('access_token');
-  const expiresIn = params.get('expires_in');
+// Redirect user to Spotify Login using Authorization Code Flow with PKCE
+export async function loginWithSpotify() {
+  const verifier = generateCodeVerifier(128);
+  localStorage.setItem('spotify_code_verifier', verifier);
 
-  if (token) {
-    // Save token and calculation for expiration
-    localStorage.setItem('spotify_token', token);
-    const expirationTime = Date.now() + Number(expiresIn) * 1000;
+  const challenge = await generateCodeChallenge(verifier);
+  const redirectUri = encodeURIComponent(getRedirectUri());
+  const scopes = encodeURIComponent('user-read-private user-read-email');
+  
+  window.location.href = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${redirectUri}&code_challenge_method=S256&code_challenge=${challenge}&scope=${scopes}&show_dialog=true`;
+}
+
+// Check URL for code and exchange it for token
+export async function checkUrlForSpotifyCode(): Promise<string | null> {
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+  if (!code) return null;
+
+  const codeVerifier = localStorage.getItem('spotify_code_verifier');
+  if (!codeVerifier) return null;
+
+  const redirectUri = getRedirectUri();
+
+  try {
+    const payload = new URLSearchParams({
+      client_id: CLIENT_ID,
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: redirectUri,
+      code_verifier: codeVerifier,
+    });
+
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: payload,
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error('Error exchanging token:', errData);
+      return null;
+    }
+
+    const data = await res.json();
+    
+    // Save credentials
+    localStorage.setItem('spotify_token', data.access_token);
+    const expirationTime = Date.now() + Number(data.expires_in) * 1000;
     localStorage.setItem('spotify_token_expires', expirationTime.toString());
     
-    // Clear hash from URL cleanly
-    window.history.replaceState(null, '', window.location.pathname + window.location.search);
-    return token;
+    // Clean code verifier
+    localStorage.removeItem('spotify_code_verifier');
+    
+    // Clear code from URL search parameters cleanly
+    const url = new URL(window.location.href);
+    url.searchParams.delete('code');
+    window.history.replaceState(null, '', url.pathname + url.search);
+
+    return data.access_token;
+  } catch (e) {
+    console.error('Failed to exchange code for token:', e);
+    return null;
   }
-  return null;
 }
 
 // Get valid stored token
@@ -62,6 +120,7 @@ export function logoutSpotify() {
   localStorage.removeItem('spotify_token_expires');
   localStorage.removeItem('spotify_user_name');
   localStorage.removeItem('spotify_user_image');
+  localStorage.removeItem('spotify_code_verifier');
 }
 
 // Get User Profile Info from Spotify
@@ -85,7 +144,7 @@ export async function getSpotifyUserProfile(token: string) {
 // Dynamic Spotify search
 export async function searchSpotify(query: string): Promise<Track[]> {
   const token = getSpotifyToken();
-  if (!token) return []; // Fallback to empty if not logged in
+  if (!token) return [];
 
   try {
     const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`, {
@@ -93,7 +152,6 @@ export async function searchSpotify(query: string): Promise<Track[]> {
     });
     
     if (res.status === 401) {
-      // Token expired
       logoutSpotify();
       return [];
     }
@@ -108,7 +166,7 @@ export async function searchSpotify(query: string): Promise<Track[]> {
       cover: item.album.images?.[0]?.url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300',
       duration: Math.round(item.duration_ms / 1000),
       source: 'spotify',
-      videoId: '', // Will be resolved to YT Video ID on play
+      videoId: '',
       tag: 'Spotify Search'
     }));
   } catch (e) {
