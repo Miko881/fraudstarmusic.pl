@@ -22,7 +22,7 @@ function generateCodeVerifier(length: number): string {
 }
 
 // Generate code challenge from verifier using SHA-256
-async function generateCodeChallenge(codeVerifier: string): string {
+async function generateCodeChallenge(codeVerifier: string): Promise<string> {
   const data = new TextEncoder().encode(codeVerifier);
   const digest = await window.crypto.subtle.digest('SHA-256', data);
   return btoa(String.fromCharCode.apply(null, [...new Uint8Array(digest)]))
