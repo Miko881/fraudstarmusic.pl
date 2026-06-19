@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Gradient for the border (from omnicord-cyan to omnicord-neon) -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#deff9a" />
+    </linearGradient>
+    
+    <!-- Glow filter for the background glow -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="40" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Glowing shadow layer (using cyan shadow for glow) -->
+  <rect x="60" y="60" width="392" height="392" rx="110" fill="none" stroke="#06b6d4" stroke-width="40" opacity="0.45" filter="url(#glow)" />
+
+  <!-- Outer border containing the gradient -->
+  <rect x="40" y="40" width="432" height="432" rx="120" fill="url(#borderGrad)" />
+
+  <!-- Inner black container to match the UI theme -->
+  <rect x="56" y="56" width="400" height="400" rx="108" fill="#050505" />
+
+  <!-- Centered 'O' in omnicord-neon color -->
+  <text x="256" y="252" font-family="'Outfit', 'Inter', system-ui, -apple-system, sans-serif" font-weight="900" font-size="220" fill="#deff9a" text-anchor="middle" dominant-baseline="central">O</text>
+</svg>

@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+@theme {
+  --color-omnicord-bg: #050505;
+  --color-omnicord-neon: #deff9a;
+  --color-omnicord-cyan: #06b6d4;
+  --color-omnicord-glass: rgba(255, 255, 255, 0.03);
+  --color-omnicord-glass-border: rgba(255, 255, 255, 0.08);
+  --color-omnicord-card: rgba(20, 20, 20, 0.6);
+  
+  --font-outfit: "Outfit", sans-serif;
+  
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-spin-slow: spin 12s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+}
+
+body {
+  @apply bg-[#050505] text-gray-300 font-outfit select-none overflow-hidden;
+  background-image: 
+    radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(222, 255, 154, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.02) 0%, transparent 60%);
+  min-height: 100vh;
+}
+
+/* Custom glassmorphic scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.01);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.3);
+}
+
+/* Glassmorphism Panel styles */
+.glass-panel {
+  @apply bg-[#0c0c0c]/90 border border-white/[0.06] shadow-2xl;
+}
+
+.glass-card {
+  @apply bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.12] rounded-2xl p-4 transition-all duration-300;
+}
+
+.glass-input {
+  @apply bg-white/[0.04] border border-white/[0.08] focus:border-omnicord-cyan/50 focus:ring-1 focus:ring-omnicord-cyan/30 rounded-xl px-4 py-2 text-white outline-none transition-all duration-200;
+}
+
+.btn-neon {
+  @apply bg-omnicord-neon text-black font-semibold rounded-full px-6 py-2.5 hover:shadow-[0_0_15px_rgba(222,255,154,0.5)] active:scale-95 transition-all duration-200;
+}
+
+.btn-cyan {
+  @apply bg-omnicord-cyan text-white font-semibold rounded-full px-6 py-2.5 hover:shadow-[0_0_15px_rgba(6,182,212,0.5)] active:scale-95 transition-all duration-200;
+}
+
+.glow-neon {
+  box-shadow: 0 0 20px rgba(222, 255, 154, 0.15);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.15);
+}
+
+.glow-text-neon {
+  text-shadow: 0 0 10px rgba(222, 255, 154, 0.4);
+}
+
+.glow-text-cyan {
+  text-shadow: 0 0 10px rgba(6, 182, 212, 0.4);
+}
+
+/* Custom slider track styling */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  outline: none;
+  @apply transition-all duration-150;
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #deff9a;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(222, 255, 154, 0.8);
+  transition: transform 0.1s ease;
+}
+
+.range-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.3);
+}
+
+.range-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: #deff9a;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(222, 255, 154, 0.8);
+  transition: transform 0.1s ease;
+}
+
+.range-slider:hover::-moz-range-thumb {
+  transform: scale(1.3);
+}
+
+/* Animations */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin-slow {
+  animation: spin-slow 20s linear infinite;
+}
+
+.spin-paused {
+  animation-play-state: paused;
+}
