@@ -21,12 +21,13 @@ function unescapeYTResponse(dataEscaped: string): string {
  */
 async function fetchHtmlWithFallbackProxies(targetUrl: string): Promise<string> {
   const proxies = [
-    // 1. CodeTabs CORS Proxy (Tested and working with YouTube Music)
+    // 1. CORS.lol (Works great with YouTube Music search queries and special characters)
+    `https://api.cors.lol/?url=${encodeURIComponent(targetUrl)}`,
+    `https://cors.lol/?url=${encodeURIComponent(targetUrl)}`,
+    // 2. CodeTabs CORS Proxy
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
-    // 2. AllOrigins (Stable, good uptime)
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-    // 3. Corsproxy.io (Default fallback)
-    `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+    // 3. AllOrigins (Raw HTML option)
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
   ];
 
   let lastError: any = new Error("All proxies failed");
