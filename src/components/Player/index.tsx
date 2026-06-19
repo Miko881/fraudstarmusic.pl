@@ -5,6 +5,7 @@ import {
   Volume2, VolumeX, Tv, Loader2, Music, ThumbsUp
 } from 'lucide-react';
 import { musicEngine } from '../../services/MusicEngine';
+import { TrackCover } from '../TrackCover';
 
 export const Player: React.FC = () => {
   const {
@@ -86,7 +87,7 @@ export const Player: React.FC = () => {
             {/* Spinning Disc Cover */}
             <div className="relative w-12 h-12 md:w-14 md:h-14 rounded-full border border-white/10 shrink-0 shadow-lg overflow-hidden group">
               {currentTrack.cover ? (
-                <img 
+                <TrackCover 
                   src={currentTrack.cover} 
                   alt={currentTrack.title} 
                   className={`w-full h-full object-cover spin-slow ${

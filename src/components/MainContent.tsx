@@ -9,6 +9,7 @@ import {
   ThumbsUp 
 } from 'lucide-react';
 import { SearchResults } from './SearchResults';
+import { TrackCover } from './TrackCover';
 
 export const MainContent: React.FC = () => {
   const { 
@@ -210,7 +211,7 @@ export const MainContent: React.FC = () => {
                     className="flex-col gap-3 cursor-pointer group flex shrink-0"
                   >
                     <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden shrink-0 relative group shadow-lg border border-white/5">
-                      <img src={track.cover} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
                         <Play size={24} className="text-omnicord-neon" fill="#deff9a" />
                       </div>
@@ -261,7 +262,7 @@ export const MainContent: React.FC = () => {
                   className="flex-col gap-3 cursor-pointer group flex shrink-0"
                 >
                   <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden shrink-0 relative group shadow-lg border border-white/5">
-                    <img src={track.cover} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
                       <Play size={24} className="text-omnicord-neon" fill="#deff9a" />
                     </div>
@@ -307,7 +308,7 @@ export const MainContent: React.FC = () => {
                     className="flex-col gap-3 cursor-pointer group flex shrink-0"
                   >
                     <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden shrink-0 relative group shadow-lg border border-white/5">
-                      <img src={track.cover} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
                         <Play size={24} className="text-omnicord-neon" fill="#deff9a" />
                       </div>
@@ -353,7 +354,7 @@ export const MainContent: React.FC = () => {
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
                       <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-white/5 relative">
-                        <img src={track.cover} alt={track.title} className="w-full h-full object-cover" />
+                        <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
                           <Play size={16} className="text-omnicord-neon" fill="#deff9a" />
                         </div>
@@ -501,7 +502,7 @@ export const MainContent: React.FC = () => {
                     <div className="flex items-center gap-3 overflow-hidden min-w-0">
                       <div className="w-10 h-10 rounded-lg bg-white/5 overflow-hidden shrink-0 border border-white/5 shadow-md">
                         {track.cover ? (
-                          <img src={track.cover} alt={track.title} className="w-full h-full object-cover" />
+                          <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center"><Music size={16} className="text-gray-600" /></div>
                         )}
@@ -621,7 +622,7 @@ export const MainContent: React.FC = () => {
                     {/* Cover & Title */}
                     <div className="flex items-center gap-3 overflow-hidden min-w-0">
                       <div className="w-10 h-10 rounded-lg bg-white/5 overflow-hidden shrink-0 border border-white/5 shadow-md">
-                        <img src={track.cover} alt={track.title} className="w-full h-full object-cover" />
+                        <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="overflow-hidden min-w-0 flex-1">
                         <span className={`font-semibold text-sm truncate block tracking-wide ${

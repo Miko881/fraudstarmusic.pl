@@ -3,6 +3,7 @@ import { useOmni } from '../context/OmniProvider';
 import type { Track } from '../types';
 import { useOmniSearch } from '../hooks/useOmniSearch';
 import { Play, Plus, Clock, PlusCircle, Check, Loader2, Music } from 'lucide-react';
+import { TrackCover } from './TrackCover';
 
 export const SearchResults: React.FC = () => {
   const { searchQuery, playTrack, playlists, addTrackToPlaylist, currentTrack, isPlaying } = useOmni();
@@ -109,7 +110,7 @@ export const SearchResults: React.FC = () => {
                 <div className="flex items-center gap-3 overflow-hidden min-w-0">
                   <div className="w-10 h-10 rounded-lg bg-white/5 overflow-hidden shrink-0 border border-white/5 shadow-md">
                     {track.cover ? (
-                      <img src={track.cover} alt={track.title} className="w-full h-full object-cover" />
+                      <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center"><Music size={16} className="text-gray-600" /></div>
                     )}
