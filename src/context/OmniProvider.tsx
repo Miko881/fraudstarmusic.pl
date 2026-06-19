@@ -99,60 +99,20 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('omni_search_source', source);
   };
 
-  // Language State — URL query param has ABSOLUTE priority (?lang=en = English, default = Polish)
-  const detectLangFromUrl = (): 'pl' | 'en' | null => {
-    const params = new URLSearchParams(window.location.search);
-    const langParam = (params.get('lang') || '').toLowerCase().trim();
-    if (!langParam) return null;
-    // Accept en, eng, english, EN etc.
-    if (langParam.startsWith('en')) return 'en';
-    // Accept pl, pol, polish, PL etc.
-    if (langParam.startsWith('pl') || langParam.startsWith('po')) return 'pl';
-    return null;
-  };
-
+  // Language State — auto-detected from browser/OS region (navigator.language)
+  // Polish users (pl-PL, pl) get Polish. Everyone else gets English.
+  // localStorage remembers last session for returning users.
   const [language, setLanguageState] = useState<'pl' | 'en'>(() => {
-    // 1. URL param has ABSOLUTE priority — overrides localStorage
-    const urlLang = detectLangFromUrl();
-    if (urlLang) {
-      localStorage.setItem('omni_language', urlLang); // sync localStorage to URL
-      return urlLang;
-    }
-    // 2. localStorage fallback
     const saved = localStorage.getItem('omni_language');
     if (saved === 'pl' || saved === 'en') return saved;
-    // 3. Browser language
-    return navigator.language.startsWith('pl') ? 'pl' : 'en';
+    // Auto-detect: check browser/OS language
+    return navigator.language.toLowerCase().startsWith('pl') ? 'pl' : 'en';
   });
 
   const setLanguage = (lang: 'pl' | 'en') => {
     setLanguageState(lang);
     localStorage.setItem('omni_language', lang);
-    // Update URL query param
-    const url = new URL(window.location.href);
-    if (lang === 'en') {
-      url.searchParams.set('lang', 'en');
-    } else {
-      url.searchParams.delete('lang'); // Polish is default — clean URL
-    }
-    window.history.pushState(null, '', url.toString());
   };
-
-  // Sync language state when user hits browser back/forward
-  useEffect(() => {
-    const handlePopState = () => {
-      const urlLang = detectLangFromUrl();
-      if (urlLang) {
-        setLanguageState(urlLang);
-      } else {
-        // No URL param — use localStorage
-        const saved = localStorage.getItem('omni_language');
-        setLanguageState(saved === 'en' ? 'en' : 'pl');
-      }
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
 
   // Playback State
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
