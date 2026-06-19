@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOmni } from '../context/OmniProvider';
 import type { Track } from '../types';
-import { getSpotifyCategoryTracks } from '../utils/spotify';
 import { searchYouTube } from '../utils/youtube';
 import { 
   Search, Play, Clock, Trash2, 
@@ -79,7 +78,7 @@ export const MainContent: React.FC = () => {
     return `${mins}:${remaining.toString().padStart(2, '0')}`;
   };
 
-  // Load Spotify Category tracks dynamically when activeView or category changes
+  // Load Category tracks dynamically when activeView changes
   useEffect(() => {
     if (activeView === 'discovery') {
       loadCategoryTracks('Discovery');
@@ -87,6 +86,8 @@ export const MainContent: React.FC = () => {
       loadCategoryTracks('Trending');
     } else if (activeView === 'mix') {
       loadCategoryTracks('Mix');
+    } else if (activeView === 'start' && categoryTracks.length === 0) {
+      loadCategoryTracks('Trending');
     }
   }, [activeView]);
 
@@ -94,7 +95,15 @@ export const MainContent: React.FC = () => {
     setCategoryLoading(true);
     setActiveCategory(cat);
     try {
-      const tracks = await getSpotifyCategoryTracks(cat);
+      let query = 'music';
+      if (cat === 'Trending') {
+        query = 'muzyka hity pl';
+      } else if (cat === 'Discovery') {
+        query = 'nowe wydania muzyczne';
+      } else if (cat === 'Mix') {
+        query = 'składanka muzyczna mix';
+      }
+      const tracks = await searchYouTube(query);
       setCategoryTracks(tracks);
     } catch (e) {
       console.error(e);
