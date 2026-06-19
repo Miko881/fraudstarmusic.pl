@@ -277,7 +277,10 @@ export async function searchYouTube(query: string): Promise<Track[]> {
  * Fetch YouTube recommendations based on a videoId and/or seed query.
  * Used by Discovery, Trending, Mix sections and the Now Playing panel.
  *
- * Flow: YouTube API relatedToVideoId → Invidious search → YouTube search fallback
+ * Flow: 
+ *  1. YouTube Data API (related OR search by seedQuery) — primary, uses built-in key
+ *  2. Invidious search — fallback when quota exceeded or API key missing
+ *  3. iTunes — last resort
  */
 export async function getYouTubeRecommendations(
   videoId?: string,
@@ -287,29 +290,52 @@ export async function getYouTubeRecommendations(
   const apiKey = getApiKey();
   const seedQuery = [seedTitle, seedArtist].filter(Boolean).join(' ') || 'popular music hits';
 
-  // 1. YouTube Data API related videos (if key & quota OK)
-  if (videoId && apiKey && !isQuotaExceeded()) {
-    try {
-      console.log('[YouTube] Fetching related videos via YouTube API...');
-      const results = await getRelatedWithYouTubeAPI(videoId, apiKey);
-      if (results.length > 0) return results;
-    } catch (err: any) {
-      if (err.message !== 'QUOTA_EXCEEDED') {
-        console.warn('[YouTube] relatedToVideoId failed, trying Invidious...', err);
+  // 1. YouTube Data API — primary (always try if key present and quota not exceeded)
+  if (apiKey && !isQuotaExceeded()) {
+    // 1a. Try relatedToVideoId if we have a videoId
+    if (videoId) {
+      try {
+        console.log('[YouTube] Fetching related videos via YouTube API...');
+        const results = await getRelatedWithYouTubeAPI(videoId, apiKey);
+        if (results.length > 0) return results;
+      } catch (err: any) {
+        if (err.message === 'QUOTA_EXCEEDED') {
+          console.warn('[YouTube] Quota exceeded — falling back to Invidious.');
+        } else {
+          console.warn('[YouTube] relatedToVideoId failed, trying seedQuery search...', err);
+        }
       }
     }
+
+    // 1b. Try YouTube API search with seedQuery (works without videoId too)
+    if (!isQuotaExceeded()) {
+      try {
+        console.log('[YouTube] Searching via YouTube Data API...');
+        const results = await searchWithYouTubeAPI(seedQuery, apiKey);
+        if (results.length > 0) return results;
+      } catch (err: any) {
+        if (err.message === 'QUOTA_EXCEEDED') {
+          console.warn('[YouTube] Quota exceeded — falling back to Invidious.');
+        } else {
+          console.warn('[YouTube] YouTube API search failed, trying Invidious...', err);
+        }
+      }
+    }
+  } else if (isQuotaExceeded()) {
+    console.log('[YouTube] Daily quota exceeded — using Invidious directly.');
   }
 
-  // 2. Invidious — CORS-safe search-based approach
+  // 2. Invidious — CORS-safe search-based approach (only as fallback)
   try {
     return await getRelatedWithInvidious(seedQuery);
   } catch (invErr) {
-    console.warn('[YouTube] Invidious recommendations failed, using regular search...', invErr);
+    console.warn('[YouTube] Invidious recommendations failed, trying iTunes...', invErr);
   }
 
-  // 3. Final fallback: regular YouTube search
+  // 3. iTunes — last resort
   try {
-    return await searchYouTube(seedQuery);
+    console.log('[YouTube] Falling back to iTunes Search API...');
+    return await searchWithiTunes(seedQuery);
   } catch (err) {
     console.error('[YouTube] All recommendation methods failed:', err);
     return [];

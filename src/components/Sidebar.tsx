@@ -3,7 +3,7 @@ import { useOmni } from '../context/OmniProvider';
 import { translations } from '../utils/translations';
 import { 
   Home, Compass, TrendingUp, Radio, Plus, Settings, 
-  Music, Trash2, ThumbsUp, Globe
+  Music, Trash2, ThumbsUp
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -14,7 +14,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, onOpenPlaylistModal }) => {
   const { 
     activeView, setActiveView, playlists, selectedPlaylistId, 
-    setSelectedPlaylistId, deletePlaylist, language, setLanguage,
+    setSelectedPlaylistId, deletePlaylist, language,
     spotifyToken, spotifyUser, loginWithSpotify, logoutSpotify
   } = useOmni();
 
@@ -50,9 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, onOpenPlaylist
     return pl.name;
   };
 
-  const toggleLanguage = () => {
-    setLanguage(language === 'pl' ? 'en' : 'pl');
-  };
+
 
   return (
     <aside className="w-64 glass-panel h-full flex flex-col border-r border-white/5 relative z-10 shrink-0 hidden md:flex">
@@ -174,14 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings, onOpenPlaylist
           </button>
         )}
 
-        {/* Language switch button */}
-        <button 
-          onClick={toggleLanguage}
-          className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white text-xs font-semibold py-2.5 rounded-xl bg-white/[0.02] hover:bg-white/5 transition-colors border border-white/5 cursor-pointer"
-        >
-          <Globe size={14} className="text-omnicord-neon" />
-          <span className="uppercase">{language === 'pl' ? 'Polski' : 'English'}</span>
-        </button>
+
 
         {/* Settings button */}
         <button 
