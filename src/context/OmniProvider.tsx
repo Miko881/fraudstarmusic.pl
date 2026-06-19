@@ -99,8 +99,13 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('omni_search_source', source);
   };
 
-  // Language State
+  // Language State with subfolder routing support (/pl)
   const [language, setLanguageState] = useState<'pl' | 'en'>(() => {
+    // Check path first (e.g. /pl or /pl/)
+    const path = window.location.pathname;
+    if (path.startsWith('/pl') || path.includes('/pl/')) {
+      return 'pl';
+    }
     const saved = localStorage.getItem('omni_language');
     if (saved === 'pl' || saved === 'en') return saved;
     return navigator.language.startsWith('pl') ? 'pl' : 'en';
@@ -109,7 +114,35 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setLanguage = (lang: 'pl' | 'en') => {
     setLanguageState(lang);
     localStorage.setItem('omni_language', lang);
+    
+    // Dynamically update path/history to support subdirectories cleanly without hard reload
+    const currentPath = window.location.pathname;
+    const isCurrentlyPl = currentPath.startsWith('/pl') || currentPath.includes('/pl/');
+    
+    if (lang === 'pl' && !isCurrentlyPl) {
+      // Switch from root/EN to PL
+      const base = currentPath === '/' ? '' : currentPath;
+      window.history.pushState(null, '', `/pl${base}` + window.location.search);
+    } else if (lang === 'en' && isCurrentlyPl) {
+      // Switch from PL to root/EN
+      const cleaned = currentPath.replace(/^\/pl/, '') || '/';
+      window.history.pushState(null, '', cleaned + window.location.search);
+    }
   };
+
+  // Sync state if browser back/forward buttons are clicked
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path.startsWith('/pl') || path.includes('/pl/')) {
+        setLanguageState('pl');
+      } else {
+        setLanguageState('en');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Playback State
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
