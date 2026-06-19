@@ -182,3 +182,73 @@ export async function searchSpotify(query: string): Promise<Track[]> {
 export async function getSpotifyCategoryTracks(_category: 'Discovery' | 'Trending' | 'Mix'): Promise<Track[]> {
   return [];
 }
+
+export async function getSpotifyRecommendations(seedTrackId?: string, seedArtistName?: string): Promise<Track[]> {
+  const token = getSpotifyToken();
+  if (!token) return [];
+
+  try {
+    let url = 'https://api.spotify.com/v1/recommendations?limit=15';
+    
+    // Spotify recommendations need seed track, seed artist, or seed genre.
+    // If seedTrackId is given and looks like a Spotify ID, use it.
+    let addedSeed = false;
+    if (seedTrackId) {
+      const cleanId = seedTrackId.startsWith('spotify-') ? seedTrackId.substring(8) : seedTrackId;
+      if (cleanId && cleanId.length > 5 && !cleanId.includes(' ')) {
+        url += `&seed_tracks=${encodeURIComponent(cleanId)}`;
+        addedSeed = true;
+      }
+    }
+    
+    if (!addedSeed && seedArtistName) {
+      // Find artist ID first by searching
+      try {
+        const searchRes = await fetch(`https://api.spotify.com/v1/search?q=artist:${encodeURIComponent(seedArtistName)}&type=artist&limit=1`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          const artistId = searchData.artists?.items?.[0]?.id;
+          if (artistId) {
+            url += `&seed_artists=${encodeURIComponent(artistId)}`;
+            addedSeed = true;
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to resolve artist ID for recommendation seed:', err);
+      }
+    }
+
+    if (!addedSeed) {
+      // Fallback seed genres
+      url += `&seed_genres=pop,rock,dance,hip-hop,electronic`;
+    }
+
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (res.status === 401) {
+      logoutSpotify();
+      return [];
+    }
+
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    return (data.tracks || []).map((item: any) => ({
+      id: `spotify-${item.id}`,
+      title: item.name,
+      artist: item.artists.map((a: any) => a.name).join(', '),
+      cover: item.album.images?.[0]?.url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300',
+      duration: Math.round(item.duration_ms / 1000),
+      source: 'spotify',
+      videoId: '',
+      tag: 'Spotify Recs'
+    }));
+  } catch (e) {
+    console.error('Spotify Recommendations error:', e);
+    return [];
+  }
+}

@@ -262,3 +262,88 @@ export async function scrapeYouTubePlaylist(playlistId: string): Promise<{
     throw new Error(`Błąd importu playlisty: ${err.message}`);
   }
 }
+
+/**
+ * Fetches related YouTube/Invidious tracks based on videoId or artist query
+ */
+export async function getYouTubeRecommendations(videoId?: string, seedArtist?: string): Promise<Track[]> {
+  const apiKey = getApiKey();
+  
+  if (videoId) {
+    // 1. Try YouTube Data API relatedToVideoId if key is configured
+    if (apiKey) {
+      try {
+        console.log('Fetching YouTube related videos via API...');
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&relatedToVideoId=${encodeURIComponent(videoId)}&maxResults=15&key=${apiKey}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.items && Array.isArray(data.items)) {
+            return data.items
+              .filter((item: any) => item.id && item.id.videoId)
+              .map((item: any) => {
+                const snippets = item.snippet || {};
+                const vidId = item.id.videoId;
+                return {
+                  id: vidId,
+                  title: snippets.title || 'Nieznany tytuł',
+                  artist: snippets.channelTitle || 'Nieznany wykonawca',
+                  cover: `https://img.youtube.com/vi/${vidId}/hqdefault.jpg`,
+                  duration: 240,
+                  source: 'youtube' as const,
+                  videoId: vidId,
+                  tag: 'YT Related'
+                };
+              });
+          }
+        }
+      } catch (err) {
+        console.warn('YouTube API relatedToVideoId failed, falling back to Invidious...', err);
+      }
+    }
+
+    // 2. Try Invidious related videos
+    for (const instance of INVIDIOUS_INSTANCES) {
+      try {
+        const url = `${instance}/api/v1/videos/${encodeURIComponent(videoId)}`;
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 4000);
+        const res = await fetch(url, { signal: ctrl.signal });
+        clearTimeout(timer);
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.related && Array.isArray(data.related)) {
+            return data.related
+              .filter((item: any) => item.videoId)
+              .slice(0, 15)
+              .map((item: any) => {
+                const vidId = item.videoId;
+                return {
+                  id: vidId,
+                  title: item.title || 'Nieznany tytuł',
+                  artist: item.author || 'Nieznany wykonawca',
+                  cover: `https://img.youtube.com/vi/${vidId}/hqdefault.jpg`,
+                  duration: item.lengthSeconds || 240,
+                  source: 'youtube' as const,
+                  videoId: vidId,
+                  tag: 'YT Related'
+                };
+              });
+          }
+        }
+      } catch (err) {
+        console.warn(`Invidious related videos failed on ${instance}:`, err);
+      }
+    }
+  }
+
+  // 3. Fallback: Search YouTube using artist or general query
+  const query = seedArtist ? `${seedArtist} music` : 'popular music hits';
+  try {
+    return await searchYouTube(query);
+  } catch (err) {
+    console.error('All recommendations methods failed:', err);
+    return [];
+  }
+}

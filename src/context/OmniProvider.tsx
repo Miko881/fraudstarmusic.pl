@@ -19,6 +19,8 @@ interface OmniContextType {
   setSelectedPlaylistId: (id: string | null) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  searchSource: 'both' | 'spotify' | 'youtube';
+  setSearchSource: (source: 'both' | 'spotify' | 'youtube') => void;
 
   // Playback State
   currentTrack: Track | null;
@@ -53,11 +55,11 @@ interface OmniContextType {
   importYouTubePlaylist: (playlistId: string) => Promise<void>;
   history: Track[];
   addToHistory: (track: Track) => void;
-
+ 
   // Localization
   language: 'pl' | 'en';
   setLanguage: (lang: 'pl' | 'en') => void;
-
+ 
   // Spotify Authentication
   spotifyToken: string | null;
   spotifyUser: { name: string; image: string } | null;
@@ -84,6 +86,18 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activeView, setActiveView] = useState<'start' | 'discovery' | 'trending' | 'mix' | 'playlist' | 'search'>('start');
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  
+  // Search source selection
+  const [searchSource, setSearchSourceState] = useState<'both' | 'spotify' | 'youtube'>(() => {
+    const saved = localStorage.getItem('omni_search_source');
+    if (saved === 'both' || saved === 'spotify' || saved === 'youtube') return saved;
+    return 'both';
+  });
+
+  const setSearchSource = (source: 'both' | 'spotify' | 'youtube') => {
+    setSearchSourceState(source);
+    localStorage.setItem('omni_search_source', source);
+  };
 
   // Language State
   const [language, setLanguageState] = useState<'pl' | 'en'>(() => {
@@ -563,6 +577,8 @@ export const OmniProvider: React.FC<{ children: React.ReactNode }> = ({ children
       spotifyUser={spotifyUser}
       loginWithSpotify={loginWithSpotify}
       logoutSpotify={logoutSpotify}
+      searchSource={searchSource}
+      setSearchSource={setSearchSource}
     >
       {children}
     </OmniProviderValueHelper>

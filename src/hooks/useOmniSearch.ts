@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { Track } from '../types';
 import { searchSpotify } from '../utils/spotify';
 import { searchYouTube } from '../utils/youtube';
+import { useOmni } from '../context/OmniProvider';
 
 interface SearchResults {
   tracks: Track[];
@@ -10,6 +11,7 @@ interface SearchResults {
 }
 
 export function useOmniSearch(query: string): SearchResults {
+  const { searchSource } = useOmni();
   const [results, setResults] = useState<SearchResults>({
     tracks: [],
     loading: false,
@@ -29,11 +31,18 @@ export function useOmniSearch(query: string): SearchResults {
       setResults(prev => ({ ...prev, loading: true, error: null }));
 
       try {
-        // Trigger search on both sources in parallel
-        const [spotifyResults, youtubeResults] = await Promise.all([
-          searchSpotify(cleanQuery),
-          searchYouTube(cleanQuery)
-        ]);
+        let spotifyResults: Track[] = [];
+        let youtubeResults: Track[] = [];
+        const promises: Promise<any>[] = [];
+
+        if (searchSource === 'both' || searchSource === 'spotify') {
+          promises.push(searchSpotify(cleanQuery).then(res => { spotifyResults = res; }));
+        }
+        if (searchSource === 'both' || searchSource === 'youtube') {
+          promises.push(searchYouTube(cleanQuery).then(res => { youtubeResults = res; }));
+        }
+
+        await Promise.all(promises);
 
         if (!isMounted) return;
 

@@ -7,7 +7,7 @@ import { TrackCover } from './TrackCover';
 import { translations } from '../utils/translations';
 
 export const SearchResults: React.FC = () => {
-  const { searchQuery, playTrack, playlists, addTrackToPlaylist, currentTrack, isPlaying, language, spotifyToken, loginWithSpotify } = useOmni();
+  const { searchQuery, playTrack, playlists, addTrackToPlaylist, currentTrack, isPlaying, language, spotifyToken, loginWithSpotify, searchSource } = useOmni();
   const { tracks, loading, error } = useOmniSearch(searchQuery);
   
   const [activeMenuTrackId, setActiveMenuTrackId] = useState<string | null>(null);
@@ -44,11 +44,18 @@ export const SearchResults: React.FC = () => {
   };
 
   if (loading) {
+    let loadingText = language === 'pl' ? 'Przeszukiwanie Spotify i YouTube...' : 'Searching Spotify and YouTube...';
+    if (searchSource === 'spotify') {
+      loadingText = language === 'pl' ? 'Przeszukiwanie Spotify...' : 'Searching Spotify...';
+    } else if (searchSource === 'youtube') {
+      loadingText = language === 'pl' ? 'Przeszukiwanie YouTube...' : 'Searching YouTube...';
+    }
+
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 text-omnicord-cyan animate-spin" />
         <p className="text-sm text-gray-400 mt-3 font-medium">
-          {language === 'pl' ? 'Przeszukiwanie Spotify i YouTube...' : 'Searching Spotify and YouTube...'}
+          {loadingText}
         </p>
       </div>
     );

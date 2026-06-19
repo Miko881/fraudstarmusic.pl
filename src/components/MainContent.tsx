@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useOmni } from '../context/OmniProvider';
 import type { Track } from '../types';
-import { searchYouTube } from '../utils/youtube';
+import { searchYouTube, getYouTubeRecommendations } from '../utils/youtube';
+import { getSpotifyRecommendations } from '../utils/spotify';
 import { translations } from '../utils/translations';
 import { 
   Search, Play, Clock, Trash2, 
@@ -15,7 +16,7 @@ export const MainContent: React.FC = () => {
   const { 
     activeView, setActiveView, selectedPlaylistId, playlists, removeTrackFromPlaylist,
     searchQuery, setSearchQuery, playTrack, currentTrack, isPlaying,
-    history, language
+    history, language, spotifyToken, loginWithSpotify, searchSource, setSearchSource
   } = useOmni();
 
   // Local state for categories / custom mixes
@@ -28,9 +29,11 @@ export const MainContent: React.FC = () => {
   const [moodTracks, setMoodTracks] = useState<Track[]>([]);
   const [moodLoading, setMoodLoading] = useState(false);
 
-  // Recommendation state
-  const [recTracks, setRecTracks] = useState<Track[]>([]);
-  const [recLoading, setRecLoading] = useState(false);
+  // Recommendation states
+  const [spotifyRecs, setSpotifyRecs] = useState<Track[]>([]);
+  const [spotifyRecLoading, setSpotifyRecLoading] = useState(false);
+  const [youtubeRecs, setYoutubeRecs] = useState<Track[]>([]);
+  const [youtubeRecLoading, setYoutubeRecLoading] = useState(false);
 
   const t = translations[language];
 
@@ -44,13 +47,44 @@ export const MainContent: React.FC = () => {
     }
   }, [activeMood]);
 
+  // Load recommendations automatically when playing track, history, or spotify status changes
   useEffect(() => {
-    if (lastPlayedArtist) {
-      loadRecTracks(lastPlayedArtist);
-    } else {
-      setRecTracks([]);
-    }
-  }, [lastPlayedArtist]);
+    const loadAllRecommendations = async () => {
+      const seedTrack = currentTrack || (history && history.length > 0 ? history[0] : null);
+      
+      // 1. Fetch Spotify Recommendations (if token present)
+      if (spotifyToken) {
+        setSpotifyRecLoading(true);
+        try {
+          const seedId = seedTrack?.source === 'spotify' ? seedTrack.id : undefined;
+          const seedArtist = seedTrack?.artist;
+          const recs = await getSpotifyRecommendations(seedId, seedArtist);
+          setSpotifyRecs(recs);
+        } catch (err) {
+          console.error("Spotify recommendations fetch failed:", err);
+        } finally {
+          setSpotifyRecLoading(false);
+        }
+      } else {
+        setSpotifyRecs([]);
+      }
+
+      // 2. Fetch YouTube Music Recommendations
+      setYoutubeRecLoading(true);
+      try {
+        const seedVideoId = seedTrack?.source === 'youtube' ? seedTrack.id : seedTrack?.videoId;
+        const seedArtist = seedTrack?.artist;
+        const recs = await getYouTubeRecommendations(seedVideoId, seedArtist);
+        setYoutubeRecs(recs);
+      } catch (err) {
+        console.error("YouTube recommendations fetch failed:", err);
+      } finally {
+        setYoutubeRecLoading(false);
+      }
+    };
+
+    loadAllRecommendations();
+  }, [currentTrack, lastPlayedArtist, spotifyToken]);
 
   const getMoodSearchTerm = (mood: string) => {
     const terms: Record<string, { pl: string, en: string }> = {
@@ -93,17 +127,7 @@ export const MainContent: React.FC = () => {
     }
   };
 
-  const loadRecTracks = async (artist: string) => {
-    setRecLoading(true);
-    try {
-      const tracks = await searchYouTube(artist);
-      setRecTracks(tracks.slice(0, 10));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setRecLoading(false);
-    }
-  };
+  // Recommendations loaded automatically via useEffect
 
   const formatDuration = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -171,23 +195,61 @@ export const MainContent: React.FC = () => {
   // Render standard search top bar
   const renderTopBar = () => (
     <div className="h-20 shrink-0 px-4 md:px-8 flex items-center justify-between border-b border-white/5 bg-black/10 backdrop-blur-md relative z-10 gap-4">
-      {/* Search Input */}
-      <div className="relative w-full max-w-md md:w-96 group">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-omnicord-cyan transition-colors w-4.5 h-4.5" />
-        <input
-          type="text"
-          value={searchQuery ?? ''}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            if (e.target.value.trim().length > 0 && activeView !== 'search') {
-              setActiveView('search');
-            } else if (e.target.value.trim().length === 0 && activeView === 'search') {
-              setActiveView('start');
-            }
-          }}
-          placeholder={t.searchPlaceholder}
-          className="w-full glass-input !pl-11 bg-white/[0.02]"
-        />
+      {/* Search Input & Source Toggles */}
+      <div className="flex items-center gap-3 w-full max-w-xl">
+        <div className="relative flex-1 group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-omnicord-cyan transition-colors w-4.5 h-4.5" />
+          <input
+            type="text"
+            value={searchQuery ?? ''}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              if (e.target.value.trim().length > 0 && activeView !== 'search') {
+                setActiveView('search');
+              } else if (e.target.value.trim().length === 0 && activeView === 'search') {
+                setActiveView('start');
+              }
+            }}
+            placeholder={t.searchPlaceholder}
+            className="w-full glass-input !pl-11 bg-white/[0.02]"
+          />
+        </div>
+        
+        {/* Source selector buttons */}
+        <div className="flex items-center bg-white/[0.02] border border-white/5 rounded-xl p-0.5 shrink-0">
+          <button
+            onClick={() => setSearchSource('both')}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer select-none active:scale-95 ${
+              searchSource === 'both'
+                ? 'bg-omnicord-cyan/15 text-omnicord-neon border border-omnicord-neon/20 shadow-[0_0_10px_rgba(222,255,154,0.1)]'
+                : 'text-gray-400 hover:text-white border border-transparent'
+            }`}
+          >
+            {language === 'pl' ? 'Oba' : 'Both'}
+          </button>
+          <button
+            onClick={() => setSearchSource('spotify')}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer select-none active:scale-95 flex items-center gap-1 ${
+              searchSource === 'spotify'
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]'
+                : 'text-gray-400 hover:text-white border border-transparent'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+            <span>Spotify</span>
+          </button>
+          <button
+            onClick={() => setSearchSource('youtube')}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer select-none active:scale-95 flex items-center gap-1 ${
+              searchSource === 'youtube'
+                ? 'bg-red-500/15 text-red-400 border border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.1)]'
+                : 'text-gray-400 hover:text-white border border-transparent'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+            <span>YouTube</span>
+          </button>
+        </div>
       </div>
 
       {/* Quick Stats/User Badge */}
@@ -335,52 +397,136 @@ export const MainContent: React.FC = () => {
           </section>
         )}
 
-        {/* Recommendations Row ("Based on: Artist") */}
-        {history && history.length > 0 && recTracks.length > 0 && (
-          <section className="space-y-4">
+        {/* Spotify Recommendations Row */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
             <div>
-              <span className="text-[10px] font-bold text-omnicord-neon uppercase tracking-widest block mb-0.5">{t.recommendedForYou}</span>
-              <h2 className="text-xl font-extrabold text-white tracking-wide">{t.basedOn}: {history[0].artist}</h2>
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block mb-0.5">
+                {language === 'pl' ? 'AUTOMATYCZNE REKOMENDACJE' : 'AUTO RECOMMENDATIONS'}
+              </span>
+              <h2 className="text-xl font-extrabold text-white tracking-wide flex items-center gap-2">
+                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-emerald-500" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.565.387-.86.207-2.377-1.454-5.37-1.783-8.893-.982-.336.075-.668-.135-.744-.47-.077-.337.136-.669.47-.745 3.856-.88 7.15-.502 9.82 1.13.297.18.388.564.207.86zm1.224-2.723c-.226.367-.707.487-1.074.26-2.72-1.672-6.87-2.157-10.075-1.183-.413.125-.847-.107-.972-.52-.125-.413.107-.847.52-.972 3.666-1.112 8.232-.574 11.34 1.34.368.228.488.708.26 1.075zm.106-2.833C14.773 8.87 9.585 8.697 6.587 9.607c-.477.145-.978-.125-1.123-.603-.144-.478.125-.978.603-1.122 3.447-1.046 9.176-.846 12.793 1.302.43.256.57.813.314 1.242-.256.43-.813.57-1.242.314z"/>
+                </svg>
+                {language === 'pl' ? 'Rekomendacje Spotify' : 'Spotify Recommendations'}
+              </h2>
             </div>
+          </div>
 
-            {recLoading ? (
-              <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-none">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="space-y-3 shrink-0">
-                    <div className="w-32 h-32 sm:w-36 sm:h-36 bg-white/[0.02] border border-white/5 rounded-2xl animate-pulse"></div>
-                    <div className="h-4 bg-white/[0.02] rounded w-3/4 animate-pulse"></div>
-                    <div className="h-3 bg-white/[0.02] rounded w-1/2 animate-pulse"></div>
-                  </div>
-                ))}
+          {!spotifyToken ? (
+            <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-white">
+                  {language === 'pl' ? 'Odkryj magię rekomendacji Spotify' : 'Discover the magic of Spotify recommendations'}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {language === 'pl' 
+                    ? 'Połącz konto Spotify Premium, aby otrzymywać spersonalizowane rekomendacje bezpośrednio z algorytmów Spotify.'
+                    : 'Connect your Spotify Premium account to get personalized recommendations directly from Spotify algorithms.'}
+                </p>
               </div>
-            ) : (
-              <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-white/5 scrollbar-track-transparent">
-                {recTracks.map((track) => (
-                  <div
-                    key={track.id}
-                    onClick={() => playTrack(track, recTracks)}
-                    className="flex-col gap-3 cursor-pointer group flex shrink-0"
-                  >
-                    <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden shrink-0 relative group shadow-lg border border-white/5">
-                      <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
-                        <Play size={24} className="text-omnicord-neon" fill="#deff9a" />
-                      </div>
-                    </div>
-                    <div className="w-32 sm:w-36 pl-1 space-y-0.5">
-                      <div className="font-semibold text-sm text-white truncate leading-snug group-hover:text-omnicord-cyan transition-colors">
-                        {track.title}
-                      </div>
-                      <div className="text-xs text-gray-400 truncate font-semibold">
-                        {track.artist}
-                      </div>
+              <button 
+                onClick={loginWithSpotify}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-xs font-bold text-white rounded-xl transition-all cursor-pointer shrink-0"
+              >
+                {language === 'pl' ? 'Połącz ze Spotify' : 'Connect Spotify'}
+              </button>
+            </div>
+          ) : spotifyRecLoading ? (
+            <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-none">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="space-y-3 shrink-0">
+                  <div className="w-32 h-32 sm:w-36 sm:h-36 bg-white/[0.02] border border-white/5 rounded-2xl animate-pulse"></div>
+                  <div className="h-4 bg-white/[0.02] rounded w-3/4 animate-pulse"></div>
+                  <div className="h-3 bg-white/[0.02] rounded w-1/2 animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          ) : spotifyRecs.length === 0 ? (
+            <p className="text-xs text-gray-500 italic py-2">
+              {language === 'pl' ? 'Brak rekomendacji. Odtwórz jakiś utwór, aby zainicjować algorytm.' : 'No recommendations. Play a track to initialize the algorithm.'}
+            </p>
+          ) : (
+            <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-white/5 scrollbar-track-transparent">
+              {spotifyRecs.map((track) => (
+                <div
+                  key={track.id}
+                  onClick={() => playTrack(track, spotifyRecs)}
+                  className="flex-col gap-3 cursor-pointer group flex shrink-0"
+                >
+                  <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden shrink-0 relative group shadow-lg border border-white/5">
+                    <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
+                      <Play size={24} className="text-emerald-400" fill="#10b981" />
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+                  <div className="w-32 sm:w-36 pl-1 space-y-0.5">
+                    <div className="font-semibold text-sm text-white truncate leading-snug group-hover:text-emerald-400 transition-colors">
+                      {track.title}
+                    </div>
+                    <div className="text-xs text-gray-400 truncate font-semibold">
+                      {track.artist}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* YouTube Music Recommendations Row */}
+        <section className="space-y-4">
+          <div>
+            <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest block mb-0.5">
+              {language === 'pl' ? 'AUTOMATYCZNE REKOMENDACJE' : 'AUTO RECOMMENDATIONS'}
+            </span>
+            <h2 className="text-xl font-extrabold text-white tracking-wide flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+              {language === 'pl' ? 'Rekomendacje YouTube Music' : 'YouTube Music Recommendations'}
+            </h2>
+          </div>
+
+          {youtubeRecLoading ? (
+            <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-none">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="space-y-3 shrink-0">
+                  <div className="w-32 h-32 sm:w-36 sm:h-36 bg-white/[0.02] border border-white/5 rounded-2xl animate-pulse"></div>
+                  <div className="h-4 bg-white/[0.02] rounded w-3/4 animate-pulse"></div>
+                  <div className="h-3 bg-white/[0.02] rounded w-1/2 animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          ) : youtubeRecs.length === 0 ? (
+            <p className="text-xs text-gray-500 italic py-2">
+              {language === 'pl' ? 'Brak rekomendacji.' : 'No recommendations.'}
+            </p>
+          ) : (
+            <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-white/5 scrollbar-track-transparent">
+              {youtubeRecs.map((track) => (
+                <div
+                  key={track.id}
+                  onClick={() => playTrack(track, youtubeRecs)}
+                  className="flex-col gap-3 cursor-pointer group flex shrink-0"
+                >
+                  <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden shrink-0 relative group shadow-lg border border-white/5">
+                    <TrackCover src={track.cover} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
+                      <Play size={24} className="text-red-400" fill="#ef4444" />
+                    </div>
+                  </div>
+                  <div className="w-32 sm:w-36 pl-1 space-y-0.5">
+                    <div className="font-semibold text-sm text-white truncate leading-snug group-hover:text-red-400 transition-colors">
+                      {track.title}
+                    </div>
+                    <div className="text-xs text-gray-400 truncate font-semibold">
+                      {track.artist}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Quick Play Grid */}
         <section className="space-y-4">
