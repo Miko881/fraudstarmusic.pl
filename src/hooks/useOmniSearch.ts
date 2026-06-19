@@ -99,7 +99,7 @@ export function useOmniSearch(query: string): SearchResults {
       isMounted = false;
       clearTimeout(delayDebounce);
     };
-  }, [query]);
+  }, [query, searchSource, spotifyToken]);
 
   return results;
 }
