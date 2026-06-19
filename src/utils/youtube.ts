@@ -1,195 +1,322 @@
 import type { Track } from '../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// YouTube API / Invidious API / iTunes Search API Service
+// YouTube Data API v3 / Invidious / iTunes Fallback Service
 // ─────────────────────────────────────────────────────────────────────────────
 
-// List of public Invidious instances to try (active, CORS-friendly)
+/** Public Invidious instances – ordered by reliability. Rotated on CORS/failure. */
 const INVIDIOUS_INSTANCES = [
-  'https://yt.chocolatemoo53.com',
+  'https://invidious.nerdvpn.de',
+  'https://inv.tux.pizza',
+  'https://invidious.io.lol',
+  'https://invidious.fdn.fr',
+  'https://yt.artemislena.eu',
   'https://invidious.projectsegfau.lt',
-  'https://invidious.privacydev.net'
 ];
 
+// ─── Quota tracking ──────────────────────────────────────────────────────────
+
+const QUOTA_KEY = 'omni_yt_quota_exceeded_date';
+
+/** Returns true if we've already hit the daily YouTube quota today. */
+function isQuotaExceeded(): boolean {
+  try {
+    const stored = localStorage.getItem(QUOTA_KEY);
+    if (!stored) return false;
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    return stored === today;
+  } catch {
+    return false;
+  }
+}
+
+/** Mark quota as exceeded for today. Resets automatically next day. */
+function markQuotaExceeded(): void {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem(QUOTA_KEY, today);
+    console.warn('[YouTube] Daily quota exceeded — switching to Invidious for the rest of the day.');
+  } catch { /* ignore */ }
+}
+
+// ─── API key ─────────────────────────────────────────────────────────────────
+
 /**
- * Retrieves the YouTube Data API Key from config in localStorage or Vite env
+ * Returns the YouTube Data API key.
+ * Priority: user override (Settings / localStorage) → embedded .env key.
  */
 function getApiKey(): string | null {
+  // 1. User-configured override (Settings page)
   try {
     const saved = localStorage.getItem('omni_config');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed.youtubeApiKey) {
+      if (parsed.youtubeApiKey && parsed.youtubeApiKey.trim()) {
         return parsed.youtubeApiKey.trim();
       }
     }
   } catch (e) {
-    console.error('Error reading YouTube API key from localStorage:', e);
+    console.error('[YouTube] Error reading API key from localStorage:', e);
   }
-  return (import.meta.env.VITE_YOUTUBE_API_KEY as string) || null;
+  // 2. Built-in key from .env
+  const envKey = import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined;
+  return envKey && envKey.trim() ? envKey.trim() : null;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function mapYouTubeItem(item: any): Track {
+  const snippets = item.snippet || {};
+  const videoId: string = (item.id?.videoId ?? item.id) as string;
+  return {
+    id: videoId,
+    title: snippets.title || 'Nieznany tytuł',
+    artist: snippets.channelTitle || 'Nieznany wykonawca',
+    cover: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+    duration: 240,
+    source: 'youtube' as const,
+    videoId,
+    tag: 'YouTube',
+  };
+}
+
+function mapInvidiousItem(item: any): Track {
+  const videoId: string = item.videoId as string;
+  return {
+    id: videoId,
+    title: item.title || 'Nieznany tytuł',
+    artist: item.author || 'Nieznany wykonawca',
+    cover: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+    duration: item.lengthSeconds || 240,
+    source: 'youtube' as const,
+    videoId,
+    tag: 'YouTube',
+  };
 }
 
 /**
- * Searches YouTube using YouTube Data API v3
+ * Checks if a fetch Response represents a quota-exceeded error.
+ * YouTube returns HTTP 403 with reason "quotaExceeded" or "dailyLimitExceeded".
  */
+async function checkForQuotaError(res: Response): Promise<boolean> {
+  if (res.status !== 403) return false;
+  try {
+    const clone = res.clone();
+    const body = await clone.json();
+    const reason: string = body?.error?.errors?.[0]?.reason ?? '';
+    return reason === 'quotaExceeded' || reason === 'dailyLimitExceeded';
+  } catch {
+    return false;
+  }
+}
+
+// ─── YouTube Data API v3 ─────────────────────────────────────────────────────
+
 async function searchWithYouTubeAPI(query: string, apiKey: string): Promise<Track[]> {
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=10&key=${apiKey}`;
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&maxResults=10&key=${apiKey}`;
   const res = await fetch(url);
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(`YouTube API Error: ${res.status} - ${errorData?.error?.message || 'Unknown error'}`);
+
+  if (await checkForQuotaError(res)) {
+    markQuotaExceeded();
+    throw new Error('QUOTA_EXCEEDED');
   }
-  
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`YouTube API ${res.status}: ${err?.error?.message || 'Unknown error'}`);
+  }
+
   const data = await res.json();
-  if (!data.items || !Array.isArray(data.items)) return [];
-  
-  return data.items
-    .filter((item: any) => item.id && item.id.videoId)
-    .map((item: any) => {
-      const snippets = item.snippet || {};
-      const videoId = item.id.videoId;
-      const cover = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-      
-      return {
-        id: videoId,
-        title: snippets.title || 'Nieznany tytuł',
-        artist: snippets.channelTitle || 'Nieznany wykonawca',
-        cover,
-        duration: 240, // default placeholder, API doesn't return duration in search
-        source: 'youtube' as const,
-        videoId,
-        tag: 'YouTube',
-      };
-    });
+  return (data.items ?? []).filter((i: any) => i?.id?.videoId).map(mapYouTubeItem);
 }
 
+async function getRelatedWithYouTubeAPI(videoId: string, apiKey: string): Promise<Track[]> {
+  // Note: relatedToVideoId was deprecated in Aug 2023 in the free tier.
+  // We use a search query instead: "<title> artist" which is more reliable.
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&relatedToVideoId=${encodeURIComponent(videoId)}&maxResults=15&key=${apiKey}`;
+  const res = await fetch(url);
+
+  if (await checkForQuotaError(res)) {
+    markQuotaExceeded();
+    throw new Error('QUOTA_EXCEEDED');
+  }
+  if (!res.ok) throw new Error(`YouTube API ${res.status}`);
+
+  const data = await res.json();
+  return (data.items ?? []).filter((i: any) => i?.id?.videoId).map(mapYouTubeItem);
+}
+
+// ─── Invidious ───────────────────────────────────────────────────────────────
+
 /**
- * Searches YouTube using public Invidious instances (CORS fallback)
+ * Try each Invidious instance in turn. Returns first successful result.
+ * Uses a 5-second per-instance timeout.
  */
-async function searchWithInvidious(query: string): Promise<Track[]> {
-  let lastError = null;
-  
+async function tryInvidiousInstances<T>(
+  buildUrl: (instance: string) => string,
+  processData: (data: any, instance: string) => T | null,
+): Promise<T> {
+  let lastErr: Error = new Error('No Invidious instances available');
+
   for (const instance of INVIDIOUS_INSTANCES) {
     try {
-      const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 4000);
-      const res = await fetch(url, { signal: ctrl.signal });
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      const res = await fetch(buildUrl(instance), { signal: ctrl.signal });
       clearTimeout(timer);
-      
+
       if (!res.ok) continue;
-      
       const data = await res.json();
-      if (!Array.isArray(data)) continue;
-      
-      return data
-        .filter((item: any) => item.videoId)
-        .map((item: any) => {
-          const videoId = item.videoId;
-          const cover = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-            
-          return {
-            id: videoId,
-            title: item.title || 'Nieznany tytuł',
-            artist: item.author || 'Nieznany wykonawca',
-            cover,
-            duration: item.lengthSeconds || 240,
-            source: 'youtube' as const,
-            videoId,
-            tag: 'YouTube',
-          };
-        });
+      const result = processData(data, instance);
+      if (result !== null) return result;
     } catch (err: any) {
-      lastError = err;
-      console.warn(`Invidious instance failed: ${instance} - ${err.message}`);
+      lastErr = err;
+      console.warn(`[Invidious] ${instance} failed:`, err.message);
     }
   }
-  
-  throw lastError || new Error('All Invidious instances failed');
+  throw lastErr;
+}
+
+async function searchWithInvidious(query: string): Promise<Track[]> {
+  console.log('[Invidious] Searching via Invidious instances...');
+  return tryInvidiousInstances(
+    (inst) => `${inst}/api/v1/search?q=${encodeURIComponent(query)}&type=video&fields=videoId,title,author,lengthSeconds`,
+    (data) => {
+      if (!Array.isArray(data)) return null;
+      const results = data.filter((i: any) => i.videoId).map(mapInvidiousItem);
+      return results.length > 0 ? results : null;
+    },
+  );
 }
 
 /**
- * Searches iTunes Search API as metadata fallback (CORS-friendly, no keys)
+ * Get related videos from Invidious using SEARCH (not /videos/:id) to avoid CORS issues.
+ * We search for "<title> <artist>" which gives decent related results.
  */
+async function getRelatedWithInvidious(seedQuery: string, count = 15): Promise<Track[]> {
+  console.log('[Invidious] Fetching recommendations via Invidious search...');
+  return tryInvidiousInstances(
+    (inst) => `${inst}/api/v1/search?q=${encodeURIComponent(seedQuery)}&type=video&fields=videoId,title,author,lengthSeconds`,
+    (data) => {
+      if (!Array.isArray(data)) return null;
+      const results = data.filter((i: any) => i.videoId).slice(0, count).map(mapInvidiousItem);
+      return results.length > 0 ? results : null;
+    },
+  );
+}
+
+// ─── iTunes fallback ─────────────────────────────────────────────────────────
+
 async function searchWithiTunes(query: string): Promise<Track[]> {
   const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=15&explicit=yes`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`iTunes API Error: ${res.status}`);
-  
+  if (!res.ok) throw new Error(`iTunes API ${res.status}`);
+
   const data = await res.json();
-  if (!data.results || !Array.isArray(data.results)) return [];
-  
-  return data.results
-    .filter((item: any) => item.trackName && item.artistName)
-    .map((item: any) => {
-      const cover = item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '400x400bb') : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
-      const searchQuery = `${item.artistName} ${item.trackName}`;
-      
+  return (data.results ?? [])
+    .filter((i: any) => i.trackName && i.artistName)
+    .map((i: any) => {
+      const cover = (i.artworkUrl100 ?? '').replace('100x100bb', '400x400bb') ||
+        'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
+      const searchQuery = `${i.artistName} ${i.trackName}`;
       return {
-        // Use a unique query placeholder ID so Player/OmniProvider knows to resolve it
-        id: `itunes-${item.trackId || Math.random()}`,
-        title: item.trackName,
-        artist: item.artistName,
+        id: `itunes-${i.trackId || Math.random()}`,
+        title: i.trackName,
+        artist: i.artistName,
         cover,
-        duration: Math.floor((item.trackTimeMillis || 240000) / 1000),
+        duration: Math.floor((i.trackTimeMillis || 240000) / 1000),
         source: 'youtube' as const,
-        videoId: `itq-${searchQuery.toLowerCase().replace(/[^a-z0-9]/g, '-')}`, // marker
-        tag: item.primaryGenreName || 'Music',
+        videoId: `itq-${searchQuery.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+        tag: i.primaryGenreName || 'Music',
       };
     });
 }
 
+// ─── Public API ──────────────────────────────────────────────────────────────
+
 /**
- * Main Search Entrance. Tries YouTube API -> Invidious Fallback -> iTunes Fallback.
+ * Main search entry point.
+ * Flow: YouTube Data API (if key present & quota OK) → Invidious → iTunes
  */
 export async function searchYouTube(query: string): Promise<Track[]> {
-  if (!query || query.trim().length === 0) return [];
-  
+  if (!query || !query.trim()) return [];
+
   const apiKey = getApiKey();
-  
-  if (apiKey) {
+
+  // Try YouTube API only if key present and today's quota is not blown
+  if (apiKey && !isQuotaExceeded()) {
     try {
-      console.log('Searching via YouTube Data API...');
+      console.log('[YouTube] Searching via YouTube Data API...');
       return await searchWithYouTubeAPI(query, apiKey);
-    } catch (err) {
-      console.warn('YouTube API search failed, falling back to Invidious...', err);
+    } catch (err: any) {
+      if (err.message === 'QUOTA_EXCEEDED') {
+        console.warn('[YouTube] Quota exceeded — falling back to Invidious.');
+      } else {
+        console.warn('[YouTube] API search failed, trying Invidious...', err);
+      }
     }
+  } else if (isQuotaExceeded()) {
+    console.log('[YouTube] Daily quota already exceeded — using Invidious directly.');
   }
-  
+
   try {
-    console.log('Searching via Invidious instances...');
     return await searchWithInvidious(query);
-  } catch (err) {
-    console.warn('Invidious search failed, falling back to iTunes API...', err);
+  } catch (invErr) {
+    console.warn('[YouTube] Invidious search failed, trying iTunes...', invErr);
   }
-  
+
   try {
-    console.log('Searching via iTunes Search API (requires runtime resolution)...');
+    console.log('[YouTube] Falling back to iTunes Search API...');
     return await searchWithiTunes(query);
   } catch (err) {
-    console.error('All search APIs failed:', err);
-    return getMockSearchResults(query);
+    console.error('[YouTube] All search methods failed:', err);
+    return [];
   }
 }
 
-function getMockSearchResults(query: string): Track[] {
-  const q = query.toLowerCase();
-  const mocks: Track[] = [
-    {
-      id: 'dQw4w9WgXcQ',
-      title: 'Never Gonna Give You Up',
-      artist: 'Rick Astley',
-      cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80',
-      duration: 212,
-      source: 'youtube',
-      videoId: 'dQw4w9WgXcQ',
-      tag: 'Pop',
+/**
+ * Fetch YouTube recommendations based on a videoId and/or seed query.
+ * Used by Discovery, Trending, Mix sections and the Now Playing panel.
+ *
+ * Flow: YouTube API relatedToVideoId → Invidious search → YouTube search fallback
+ */
+export async function getYouTubeRecommendations(
+  videoId?: string,
+  seedArtist?: string,
+  seedTitle?: string,
+): Promise<Track[]> {
+  const apiKey = getApiKey();
+  const seedQuery = [seedTitle, seedArtist].filter(Boolean).join(' ') || 'popular music hits';
+
+  // 1. YouTube Data API related videos (if key & quota OK)
+  if (videoId && apiKey && !isQuotaExceeded()) {
+    try {
+      console.log('[YouTube] Fetching related videos via YouTube API...');
+      const results = await getRelatedWithYouTubeAPI(videoId, apiKey);
+      if (results.length > 0) return results;
+    } catch (err: any) {
+      if (err.message !== 'QUOTA_EXCEEDED') {
+        console.warn('[YouTube] relatedToVideoId failed, trying Invidious...', err);
+      }
     }
-  ];
-  return mocks.filter(m =>
-    m.title.toLowerCase().includes(q) || m.artist.toLowerCase().includes(q)
-  );
+  }
+
+  // 2. Invidious — CORS-safe search-based approach
+  try {
+    return await getRelatedWithInvidious(seedQuery);
+  } catch (invErr) {
+    console.warn('[YouTube] Invidious recommendations failed, using regular search...', invErr);
+  }
+
+  // 3. Final fallback: regular YouTube search
+  try {
+    return await searchYouTube(seedQuery);
+  } catch (err) {
+    console.error('[YouTube] All recommendation methods failed:', err);
+    return [];
+  }
 }
+
+// ─── Playlist import ─────────────────────────────────────────────────────────
 
 export function extractPlaylistId(input: string): string | null {
   const trimmed = input.trim();
@@ -199,9 +326,6 @@ export function extractPlaylistId(input: string): string | null {
   return null;
 }
 
-/**
- * Scrapes/Fetches YouTube Playlist items. Requires YouTube API Key.
- */
 export async function scrapeYouTubePlaylist(playlistId: string): Promise<{
   name: string;
   description: string;
@@ -209,141 +333,72 @@ export async function scrapeYouTubePlaylist(playlistId: string): Promise<{
 }> {
   const apiKey = getApiKey();
   if (!apiKey) {
-    throw new Error('Importowanie playlist YouTube wymaga skonfigurowania klucza API w Ustawieniach.');
+    throw new Error('Importowanie playlist YouTube wymaga klucza API w Ustawieniach.');
   }
-  
-  try {
-    // 1. Fetch Playlist Info
-    const infoUrl = `https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${playlistId}&key=${apiKey}`;
-    const infoRes = await fetch(infoUrl);
-    if (!infoRes.ok) throw new Error(`Status ${infoRes.status} fetching playlist metadata`);
-    const infoData = await infoRes.json();
-    
-    if (!infoData.items || infoData.items.length === 0) {
-      throw new Error('Playlista nie została znaleziona lub jest prywatna.');
-    }
-    
-    const playlistSnippet = infoData.items[0].snippet;
-    const name = playlistSnippet.title || 'Zaimportowana playlista';
-    const description = playlistSnippet.description || 'Zaimportowano z YouTube';
-    
-    // 2. Fetch Playlist Items
-    const itemsUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${playlistId}&maxResults=50&key=${apiKey}`;
-    const itemsRes = await fetch(itemsUrl);
-    if (!itemsRes.ok) throw new Error(`Status ${itemsRes.status} fetching playlist items`);
-    const itemsData = await itemsRes.json();
-    
-    if (!itemsData.items || !Array.isArray(itemsData.items)) {
-      return { name, description, tracks: [] };
-    }
-    
-    const tracks: Track[] = itemsData.items
-      .filter((item: any) => item.contentDetails && item.contentDetails.videoId)
-      .map((item: any) => {
-        const snippet = item.snippet || {};
-        const videoId = item.contentDetails.videoId;
-        const cover = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        
-        return {
-          id: videoId,
-          title: snippet.title || 'Nieznany tytuł',
-          artist: snippet.videoOwnerChannelTitle || snippet.channelTitle || 'Nieznany wykonawca',
-          cover,
-          duration: 240, // placeholder
-          source: 'youtube' as const,
-          videoId,
-          tag: 'YouTube Playlist'
-        };
-      });
-      
-    return { name, description, tracks };
-  } catch (err: any) {
-    console.error('Playlist import failed:', err);
-    throw new Error(`Błąd importu playlisty: ${err.message}`);
+  if (isQuotaExceeded()) {
+    throw new Error('Dzienny limit YouTube API został osiągnięty. Spróbuj ponownie jutro.');
   }
+
+  // Playlist info
+  const infoRes = await fetch(
+    `https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${playlistId}&key=${apiKey}`
+  );
+  if (await checkForQuotaError(infoRes)) {
+    markQuotaExceeded();
+    throw new Error('Dzienny limit YouTube API został osiągnięty.');
+  }
+  if (!infoRes.ok) throw new Error(`Status ${infoRes.status} fetching playlist metadata`);
+  const infoData = await infoRes.json();
+
+  if (!infoData.items?.length) {
+    throw new Error('Playlista nie została znaleziona lub jest prywatna.');
+  }
+
+  const playlistSnippet = infoData.items[0].snippet;
+  const name = playlistSnippet.title || 'Zaimportowana playlista';
+  const description = playlistSnippet.description || 'Zaimportowano z YouTube';
+
+  // Playlist items
+  const itemsRes = await fetch(
+    `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${playlistId}&maxResults=50&key=${apiKey}`
+  );
+  if (await checkForQuotaError(itemsRes)) {
+    markQuotaExceeded();
+    throw new Error('Dzienny limit YouTube API został osiągnięty.');
+  }
+  if (!itemsRes.ok) throw new Error(`Status ${itemsRes.status} fetching playlist items`);
+  const itemsData = await itemsRes.json();
+
+  const tracks: Track[] = (itemsData.items ?? [])
+    .filter((item: any) => item?.contentDetails?.videoId)
+    .map((item: any) => {
+      const snippet = item.snippet || {};
+      const videoId: string = item.contentDetails.videoId;
+      return {
+        id: videoId,
+        title: snippet.title || 'Nieznany tytuł',
+        artist: snippet.videoOwnerChannelTitle || snippet.channelTitle || 'Nieznany wykonawca',
+        cover: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        duration: 240,
+        source: 'youtube' as const,
+        videoId,
+        tag: 'YouTube Playlist',
+      };
+    });
+
+  return { name, description, tracks };
 }
 
-/**
- * Fetches related YouTube/Invidious tracks based on videoId or artist query
- */
-export async function getYouTubeRecommendations(videoId?: string, seedArtist?: string): Promise<Track[]> {
-  const apiKey = getApiKey();
-  
-  if (videoId) {
-    // 1. Try YouTube Data API relatedToVideoId if key is configured
-    if (apiKey) {
-      try {
-        console.log('Fetching YouTube related videos via API...');
-        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&relatedToVideoId=${encodeURIComponent(videoId)}&maxResults=15&key=${apiKey}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.items && Array.isArray(data.items)) {
-            return data.items
-              .filter((item: any) => item.id && item.id.videoId)
-              .map((item: any) => {
-                const snippets = item.snippet || {};
-                const vidId = item.id.videoId;
-                return {
-                  id: vidId,
-                  title: snippets.title || 'Nieznany tytuł',
-                  artist: snippets.channelTitle || 'Nieznany wykonawca',
-                  cover: `https://img.youtube.com/vi/${vidId}/hqdefault.jpg`,
-                  duration: 240,
-                  source: 'youtube' as const,
-                  videoId: vidId,
-                  tag: 'YT Related'
-                };
-              });
-          }
-        }
-      } catch (err) {
-        console.warn('YouTube API relatedToVideoId failed, falling back to Invidious...', err);
-      }
-    }
+// ─── Category helpers ────────────────────────────────────────────────────────
 
-    // 2. Try Invidious related videos
-    for (const instance of INVIDIOUS_INSTANCES) {
-      try {
-        const url = `${instance}/api/v1/videos/${encodeURIComponent(videoId)}`;
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 4000);
-        const res = await fetch(url, { signal: ctrl.signal });
-        clearTimeout(timer);
-        
-        if (res.ok) {
-          const data = await res.json();
-          if (data.related && Array.isArray(data.related)) {
-            return data.related
-              .filter((item: any) => item.videoId)
-              .slice(0, 15)
-              .map((item: any) => {
-                const vidId = item.videoId;
-                return {
-                  id: vidId,
-                  title: item.title || 'Nieznany tytuł',
-                  artist: item.author || 'Nieznany wykonawca',
-                  cover: `https://img.youtube.com/vi/${vidId}/hqdefault.jpg`,
-                  duration: item.lengthSeconds || 240,
-                  source: 'youtube' as const,
-                  videoId: vidId,
-                  tag: 'YT Related'
-                };
-              });
-          }
-        }
-      } catch (err) {
-        console.warn(`Invidious related videos failed on ${instance}:`, err);
-      }
-    }
-  }
-
-  // 3. Fallback: Search YouTube using artist or general query
-  const query = seedArtist ? `${seedArtist} music` : 'popular music hits';
-  try {
-    return await searchYouTube(query);
-  } catch (err) {
-    console.error('All recommendations methods failed:', err);
-    return [];
-  }
+/** Searches YouTube for tracks matching a Discovery / Trending / Mix category keyword. */
+export async function getYouTubeCategoryTracks(
+  category: 'Discovery' | 'Trending' | 'Mix',
+): Promise<Track[]> {
+  const queries: Record<typeof category, string> = {
+    Discovery: 'new music 2025 indie hits',
+    Trending: 'trending music 2025 viral hits',
+    Mix: 'popular music mix 2025',
+  };
+  return searchYouTube(queries[category]);
 }

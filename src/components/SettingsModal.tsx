@@ -102,21 +102,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               <Key size={16} className="text-omnicord-cyan" />
               <span>YouTube API</span>
             </div>
-            
-            <p className="text-[11px] text-gray-400 leading-relaxed">
-              {language === 'pl' 
-                ? 'Wklej swój klucz YouTube Data API v3, aby odblokować błyskawiczne wyszukiwanie i importowanie playlist. Bez klucza aplikacja korzysta z serwerów publicznych.'
-                : 'Paste your YouTube Data API v3 key to unlock instant searches and playlist imports. Without it, the app falls back to public servers.'}
-            </p>
 
+            {/* Built-in key status */}
+            <div className="flex items-center gap-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3.5 py-2.5">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+              <p className="text-[11px] text-emerald-300 leading-relaxed">
+                {language === 'pl'
+                  ? 'Wbudowany klucz YouTube API jest aktywny — użytkownicy nie muszą konfigurować niczego ręcznie. Po osiągnięciu dziennego limitu aplikacja automatycznie przełącza się na Invidious.'
+                  : 'Built-in YouTube API key is active — users don\'t need to configure anything. When the daily quota is hit, the app automatically falls back to Invidious.'}
+              </p>
+            </div>
+
+            {/* Quota reset */}
+            <div className="flex items-center justify-between bg-white/5 rounded-xl px-3.5 py-2.5">
+              <div>
+                <p className="text-xs text-gray-300 font-medium">
+                  {language === 'pl' ? 'Dzienny limit YouTube API' : 'YouTube API Daily Quota'}
+                </p>
+                <p className="text-[10px] text-gray-500 mt-0.5">
+                  {language === 'pl'
+                    ? 'Resetuje się codziennie o północy. Kliknij aby wymusić reset.'
+                    : 'Resets at midnight daily. Click to force reset.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('omni_yt_quota_exceeded_date');
+                  alert(language === 'pl' ? 'Limit zresetowany — YouTube API jest aktywne.' : 'Quota reset — YouTube API is now active.');
+                }}
+                className="text-xs text-omnicord-cyan hover:text-white border border-omnicord-cyan/30 hover:border-omnicord-cyan/70 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+              >
+                {language === 'pl' ? 'Resetuj limit' : 'Reset quota'}
+              </button>
+            </div>
+
+            {/* Optional override */}
             <div className="space-y-2">
-              <label className="block text-xs text-gray-400">{t.youtubeApiKeyLabel}</label>
+              <label className="block text-xs text-gray-400">
+                {language === 'pl' ? 'Nadpisz klucz (opcjonalnie)' : 'Override key (optional)'}
+              </label>
               <input
                 type="password"
                 value={youtubeApiKey}
                 onChange={(e) => setYoutubeApiKey(e.target.value)}
-                placeholder="AIzaSy..."
-                className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-2.5 text-white outline-none focus:border-omnicord-cyan/50 text-sm font-mono tracking-wider"
+                placeholder={language === 'pl' ? 'Pozostaw puste aby użyć wbudowanego klucza' : 'Leave empty to use built-in key'}
+                className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-2.5 text-white outline-none focus:border-omnicord-cyan/50 text-sm font-mono tracking-wider placeholder-gray-600"
               />
             </div>
           </div>

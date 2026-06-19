@@ -74,7 +74,8 @@ export const MainContent: React.FC = () => {
       try {
         const seedVideoId = seedTrack?.source === 'youtube' ? seedTrack.id : seedTrack?.videoId;
         const seedArtist = seedTrack?.artist;
-        const recs = await getYouTubeRecommendations(seedVideoId, seedArtist);
+        const seedTitle = seedTrack?.title;
+        const recs = await getYouTubeRecommendations(seedVideoId, seedArtist, seedTitle);
         setYoutubeRecs(recs);
       } catch (err) {
         console.error("YouTube recommendations fetch failed:", err);
