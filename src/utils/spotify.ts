@@ -234,7 +234,29 @@ export async function getSpotifyRecommendations(seedTrackId?: string, seedArtist
       return [];
     }
 
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn(`[Spotify] Recommendations failed with status ${res.status}. Falling back to search...`);
+      let fallbackQuery = 'popular';
+      if (seedArtistName) {
+        fallbackQuery = seedArtistName;
+      } else if (seedTrackId) {
+        try {
+          const cleanId = seedTrackId.startsWith('spotify-') ? seedTrackId.substring(8) : seedTrackId;
+          const trackRes = await fetch(`https://api.spotify.com/v1/tracks/${cleanId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (trackRes.ok) {
+            const trackData = await trackRes.json();
+            if (trackData.artists?.[0]?.name) {
+              fallbackQuery = trackData.artists[0].name;
+            }
+          }
+        } catch (err) {
+          console.warn('[Spotify] Failed to fetch seed track details for fallback:', err);
+        }
+      }
+      return await searchSpotify(fallbackQuery);
+    }
 
     const data = await res.json();
     return (data.tracks || []).map((item: any) => ({

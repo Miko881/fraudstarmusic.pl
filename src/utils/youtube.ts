@@ -6,6 +6,8 @@ import type { Track } from '../types';
 
 /** Public Invidious instances – ordered by reliability. Rotated on CORS/failure. */
 const INVIDIOUS_INSTANCES = [
+  'https://yt.chocolatemoo53.com',
+  'https://inv.thepixora.com',
   'https://invidious.nerdvpn.de',
   'https://inv.tux.pizza',
   'https://invidious.io.lol',
@@ -99,6 +101,7 @@ function mapInvidiousItem(item: any): Track {
  * YouTube returns HTTP 403 with reason "quotaExceeded" or "dailyLimitExceeded".
  */
 async function checkForQuotaError(res: Response): Promise<boolean> {
+  if (res.status === 429) return true;
   if (res.status !== 403) return false;
   try {
     const clone = res.clone();
